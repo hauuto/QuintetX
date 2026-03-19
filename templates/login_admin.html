@@ -24,7 +24,7 @@
         </div>
 
         <!-- Form -->
-        <form @submit.prevent="isLoading = true; console.log('Admin login attempt:', username); setTimeout(() => isLoading = false, 1000);">
+        <form @submit.prevent="isLoading = true; console.log('Admin login attempt:', username); setTimeout(() => { isLoading = false; window.location.href = '/admin/dashboard'; }, 1000);">
 
             <!-- Username/Email Input -->
             <div class="mb-6">

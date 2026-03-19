@@ -26,9 +26,46 @@ async def login_page(request: Request):
 async def register_page(request: Request):
     return templates.TemplateResponse("register_student.html", {"request": request})
 
+@app.get("/student/dashboard", response_class=HTMLResponse)
+async def student_dashboard(request: Request):
+    return templates.TemplateResponse("student/dashboard.html", {"request": request})
+
+@app.get("/student/team", response_class=HTMLResponse)
+async def student_team(request: Request):
+    return templates.TemplateResponse("student/team.html", {"request": request})
+
+@app.get("/student/match", response_class=HTMLResponse)
+async def student_match(request: Request):
+    return templates.TemplateResponse("student/match.html", {"request": request})
+
+@app.get("/student/history", response_class=HTMLResponse)
+async def student_history(request: Request):
+    return templates.TemplateResponse("student/history.html", {"request": request})
+
 @app.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
     return templates.TemplateResponse("login_admin.html", {"request": request})
+
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+async def admin_dashboard(request: Request):
+    return templates.TemplateResponse("admin/dashboard.html", {"request": request})
+
+# Placeholder routes for sidebar links
+@app.get("/admin/teams", response_class=HTMLResponse)
+async def admin_teams(request: Request):
+    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+
+@app.get("/admin/rooms", response_class=HTMLResponse)
+async def admin_rooms(request: Request):
+    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+
+@app.get("/admin/match", response_class=HTMLResponse)
+async def admin_match(request: Request):
+    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+
+@app.get("/admin/approvals", response_class=HTMLResponse)
+async def admin_approvals(request: Request):
+    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
 
 if __name__ == "__main__":
     import uvicorn

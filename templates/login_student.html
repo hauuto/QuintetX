@@ -23,7 +23,7 @@
         </div>
 
         <!-- Form -->
-        <form @submit.prevent="isLoading = true; console.log('Login attempt:', mssv); /* Backend integration later */ setTimeout(() => isLoading = false, 1000);">
+        <form @submit.prevent="isLoading = true; setTimeout(() => { window.location.href = '/student/dashboard'; }, 500);">
 
             <!-- MSSV Input -->
             <div class="mb-6">

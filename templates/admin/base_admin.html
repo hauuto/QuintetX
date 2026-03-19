@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - QuintetX{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-[#F0F2F5]" x-data="{ currentPath: window.location.pathname }">
+
+    <!-- Sidebar -->
+    <aside class="w-[240px] bg-white flex flex-col shadow-sm z-20">
+        <!-- Logo -->
+        <div class="h-16 flex items-center px-6 border-b border-gray-100">
+            <span class="text-2xl font-extrabold text-[#3547E5] tracking-tighter cursor-pointer" onclick="window.location.href='/'">QuintetX</span>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 py-6 px-3 space-y-1">
+            <a href="/admin/dashboard"
+               class="flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors"
+               :class="currentPath.includes('/admin/dashboard') ? 'bg-blue-50 text-[#3547E5]' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
+                <!-- Dashboard Icon -->
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                Tổng quan
+            </a>
+
+            <a href="/admin/teams"
+               class="flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors"
+               :class="currentPath.includes('/admin/teams') ? 'bg-blue-50 text-[#3547E5]' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
+                <!-- Teams Icon (Users/Group) -->
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                Quản Lý Nhóm
+            </a>
+
+            <a href="/admin/rooms"
+               class="flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors"
+               :class="currentPath.includes('/admin/rooms') ? 'bg-blue-50 text-[#3547E5]' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
+                <!-- Rooms Icon (Play/Game Room) -->
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                Quản Lý Phòng
+            </a>
+
+            <a href="/admin/match"
+               class="flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors"
+               :class="currentPath.includes('/admin/match') ? 'bg-blue-50 text-[#3547E5]' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
+                <!-- Match Icon (Target/Location) -->
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Trận đấu
+            </a>
+
+            <a href="/admin/approvals"
+               class="flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors"
+               :class="currentPath.includes('/admin/approvals') ? 'bg-blue-50 text-[#3547E5]' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
+                <!-- Approvals Icon (Clipboard Check) -->
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Xét duyệt Admin
+            </a>
+        </nav>
+
+        <!-- User Profile (Bottom Left) -->
+        <div class="p-4 border-t border-gray-100">
+            <div class="flex items-center">
+                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-[#3547E5] font-bold">
+                    AD
+                </div>
+                <div class="ml-3 overflow-hidden">
+                    <p class="text-sm font-bold text-gray-900 truncate">Administrator</p>
+                    <p class="text-xs text-gray-500 truncate">System Admin</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <!-- Header -->
+        <header class="h-16 bg-white border-b border-gray-100 flex items-center justify-end px-8 space-x-4 shadow-sm z-10">
+            <!-- Bell Icon -->
+            <button class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+            </button>
+            <!-- Gear Icon -->
+            <button class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            </button>
+        </header>
+
+        <!-- Scrollable Content Area -->
+        <div class="flex-1 overflow-auto p-8">
+            {% block admin_content %}{% endblock %}
+        </div>
+    </main>
+</div>
+{% endblock %}
