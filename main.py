@@ -22,6 +22,10 @@ async def read_root(request: Request):
 async def login_page(request: Request):
     return templates.TemplateResponse("login_student.html", {"request": request})
 
+@app.get("/admin/login", response_class=HTMLResponse)
+async def admin_login_page(request: Request):
+    return templates.TemplateResponse("login_admin.html", {"request": request})
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
