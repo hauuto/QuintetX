@@ -22,6 +22,10 @@ async def read_root(request: Request):
 async def login_page(request: Request):
     return templates.TemplateResponse("login_student.html", {"request": request})
 
+@app.get("/register", response_class=HTMLResponse)
+async def register_page(request: Request):
+    return templates.TemplateResponse("register_student.html", {"request": request})
+
 @app.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
     return templates.TemplateResponse("login_admin.html", {"request": request})
