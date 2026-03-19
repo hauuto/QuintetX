@@ -108,3 +108,23 @@ poetry add --group dev pytest
 ```bash
 poetry remove requests
 ```
+
+## Cấu trúc dự án
+
+```
+QuintetX/
+├── app/
+│   └── core/
+│       └── config.py          # Cấu hình backend (FastAPI)
+├── static/                    # Tệp tĩnh (CSS/JS/Images)
+│   ├── favicon.svg            # Favicon chính
+│   ├── favicon.ico            # Favicon fallback
+│   └── js/
+│       └── config.js          # Cấu hình frontend
+├── templates/                 # Giao diện HTML (Jinja2)
+│   └── base.html              # Layout chính
+├── main.py                    # Entry point của ứng dụng
+├── pyproject.toml             # Quản lý dependency (Poetry)
+├── poetry.lock                # Lockfile của Poetry
+└── README.md                  # Tài liệu dự án
+```
