@@ -46,6 +46,27 @@ async def student_history(request: Request):
 async def admin_login_page(request: Request):
     return templates.TemplateResponse("login_admin.html", {"request": request})
 
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+async def admin_dashboard(request: Request):
+    return templates.TemplateResponse("admin/dashboard.html", {"request": request})
+
+# Placeholder routes for sidebar links
+@app.get("/admin/teams", response_class=HTMLResponse)
+async def admin_teams(request: Request):
+    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+
+@app.get("/admin/rooms", response_class=HTMLResponse)
+async def admin_rooms(request: Request):
+    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+
+@app.get("/admin/match", response_class=HTMLResponse)
+async def admin_match(request: Request):
+    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+
+@app.get("/admin/approvals", response_class=HTMLResponse)
+async def admin_approvals(request: Request):
+    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
