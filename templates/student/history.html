@@ -1,0 +1,88 @@
+{% extends "student/base_student.html" %}
+
+{% block student_content %}
+<div class="w-full max-w-7xl mx-auto space-y-8">
+
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900 relative inline-block">
+            Lịch sử đấu
+            <span class="absolute -bottom-1 left-0 w-1/3 h-1 bg-[#3547E5] rounded-full"></span>
+        </h1>
+    </div>
+
+    <!-- History Table Container -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left whitespace-nowrap">
+                <thead class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold">
+                    <tr>
+                        <th class="px-6 py-4 w-20 text-center">STT</th>
+                        <th class="px-6 py-4 w-48">Mã trận</th>
+                        <th class="px-6 py-4">Đối thủ</th>
+                        <th class="px-6 py-4 text-center">Số nước đi</th>
+                        <th class="px-6 py-4 text-center">Kết quả</th>
+                        <th class="px-6 py-4 text-right">Thời gian</th>
+                        <th class="px-6 py-4 text-center">Chi tiết</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 text-sm">
+                    <!-- History Item 1 -->
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 text-gray-500 font-mono text-center">01</td>
+                        <td class="px-6 py-4 font-mono text-gray-600">#MATCH-8392</td>
+                        <td class="px-6 py-4 font-semibold text-gray-900">Team Alpha</td>
+                        <td class="px-6 py-4 text-center text-gray-600">42</td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span>
+                        </td>
+                        <td class="px-6 py-4 text-gray-500 text-right">10:30 19/03/2026</td>
+                        <td class="px-6 py-4 text-center">
+                            <a href="#" class="text-[#3547E5] hover:underline font-medium">Xem lại</a>
+                        </td>
+                    </tr>
+
+                    <!-- History Item 2 -->
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 text-gray-500 font-mono text-center">02</td>
+                        <td class="px-6 py-4 font-mono text-gray-600">#MATCH-8341</td>
+                        <td class="px-6 py-4 font-semibold text-gray-900">Beta Squad</td>
+                        <td class="px-6 py-4 text-center text-gray-600">15</td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">Thua</span>
+                        </td>
+                        <td class="px-6 py-4 text-gray-500 text-right">09:15 19/03/2026</td>
+                        <td class="px-6 py-4 text-center">
+                            <a href="#" class="text-[#3547E5] hover:underline font-medium">Xem lại</a>
+                        </td>
+                    </tr>
+
+                     <!-- History Item 3 -->
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 text-gray-500 font-mono text-center">03</td>
+                        <td class="px-6 py-4 font-mono text-gray-600">#MATCH-7201</td>
+                        <td class="px-6 py-4 font-semibold text-gray-900">Gamma Rays</td>
+                        <td class="px-6 py-4 text-center text-gray-600">88</td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span>
+                        </td>
+                        <td class="px-6 py-4 text-gray-500 text-right">08:00 19/03/2026</td>
+                        <td class="px-6 py-4 text-center">
+                            <a href="#" class="text-[#3547E5] hover:underline font-medium">Xem lại</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <!-- Pagination -->
+        <div class="bg-gray-50 border-t border-gray-100 px-6 py-4 flex items-center justify-between">
+            <span class="text-xs text-gray-500">Hiển thị 1-3 trong 24 kết quả</span>
+            <div class="flex space-x-2">
+                <button class="px-3 py-1 rounded border border-gray-200 bg-white text-gray-500 text-xs hover:bg-gray-50 disabled:opacity-50">Trước</button>
+                <button class="px-3 py-1 rounded border border-gray-200 bg-white text-gray-500 text-xs hover:bg-gray-50">Sau</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
