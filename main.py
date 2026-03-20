@@ -53,7 +53,16 @@ async def admin_dashboard(request: Request):
 # Placeholder routes for sidebar links
 @app.get("/admin/teams", response_class=HTMLResponse)
 async def admin_teams(request: Request):
-    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+    # Dummy data for teams
+    teams = [
+        {"id": "T001", "name": "Dragon Slayer", "members_count": 5, "status": "Active", "created_at": "2023-10-01"},
+        {"id": "T002", "name": "Code Warriors", "members_count": 4, "status": "Active", "created_at": "2023-10-02"},
+        {"id": "T003", "name": "AI Masters", "members_count": 3, "status": "Inactive", "created_at": "2023-10-03"},
+        {"id": "T004", "name": "Gomoku Pros", "members_count": 5, "status": "Active", "created_at": "2023-10-05"},
+        {"id": "T005", "name": "Strategy Kings", "members_count": 2, "status": "Pending", "created_at": "2023-10-06"},
+    ]
+    return templates.TemplateResponse("admin/teams.html", {"request": request, "teams": teams})
+
 
 @app.get("/admin/rooms", response_class=HTMLResponse)
 async def admin_rooms(request: Request):
@@ -69,4 +78,4 @@ async def admin_approvals(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", port=8000, reload=True)
