@@ -77,7 +77,7 @@ async def admin_rooms(request: Request):
 
 @app.get("/admin/match", response_class=HTMLResponse)
 async def admin_match(request: Request):
-    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+    return templates.TemplateResponse("admin/match.html", {"request": request})
 
 @app.get("/admin/approvals", response_class=HTMLResponse)
 async def admin_approvals(request: Request):
