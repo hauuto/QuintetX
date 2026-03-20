@@ -81,7 +81,24 @@ async def admin_match(request: Request):
 
 @app.get("/admin/approvals", response_class=HTMLResponse)
 async def admin_approvals(request: Request):
-    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+    # Mock data for pending admins
+    pending_admins = [
+        {"id": "a001", "username": "tutor_minh", "email": "minh.nguyen@example.com", "created_at": "2023-10-10 08:30", "status": "pending"},
+        {"id": "a002", "username": "ta_hoa", "email": "hoa.tran@example.com", "created_at": "2023-10-11 14:15", "status": "pending"},
+         {"id": "a003", "username": "lab_assist_b", "email": "assist.b@example.com", "created_at": "2023-10-12 09:00", "status": "pending"},
+    ]
+    return templates.TemplateResponse("admin/approvals.html", {"request": request, "pending_admins": pending_admins})
+
+# API endpoints for admin approvals (Mock)
+@app.post("/api/v1/admin/approve/{admin_id}")
+async def approve_admin(admin_id: str):
+    # TODO: Implement DB update logic here
+    return {"status": "success", "message": f"Admin {admin_id} approved"}
+
+@app.delete("/api/v1/admin/reject/{admin_id}")
+async def reject_admin(admin_id: str):
+    # TODO: Implement DB delete logic here
+    return {"status": "success", "message": f"Admin request {admin_id} rejected"}
 
 if __name__ == "__main__":
     import uvicorn
