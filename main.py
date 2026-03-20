@@ -53,20 +53,53 @@ async def admin_dashboard(request: Request):
 # Placeholder routes for sidebar links
 @app.get("/admin/teams", response_class=HTMLResponse)
 async def admin_teams(request: Request):
-    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+    # Dummy data for teams
+    teams = [
+        {"id": "T001", "name": "Dragon Slayer", "members_count": 5, "status": "Active", "created_at": "2023-10-01"},
+        {"id": "T002", "name": "Code Warriors", "members_count": 4, "status": "Active", "created_at": "2023-10-02"},
+        {"id": "T003", "name": "AI Masters", "members_count": 3, "status": "Inactive", "created_at": "2023-10-03"},
+        {"id": "T004", "name": "Gomoku Pros", "members_count": 5, "status": "Active", "created_at": "2023-10-05"},
+        {"id": "T005", "name": "Strategy Kings", "members_count": 2, "status": "Pending", "created_at": "2023-10-06"},
+    ]
+    return templates.TemplateResponse("admin/teams.html", {"request": request, "teams": teams})
+
 
 @app.get("/admin/rooms", response_class=HTMLResponse)
 async def admin_rooms(request: Request):
-    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+    # Mock data for rooms
+    rooms = [
+        {"id": "1001", "name": "Room A-01", "team1": "Dragon Slayer", "team2": "Code Warriors", "status": "Đang diễn ra"},
+        {"id": "1002", "name": "Room B-02", "team1": "AI Masters", "team2": "Gomoku Pros", "status": "Kết thúc"},
+        {"id": "1003", "name": "Room C-03", "team1": "Strategy Kings", "team2": None, "status": "Chờ người chơi"},
+        {"id": "1004", "name": "Trận Chung Kết", "team1": None, "team2": None, "status": "Chờ người chơi"},
+    ]
+    return templates.TemplateResponse("admin/rooms.html", {"request": request, "rooms": rooms})
 
 @app.get("/admin/match", response_class=HTMLResponse)
 async def admin_match(request: Request):
-    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+    return templates.TemplateResponse("admin/match.html", {"request": request})
 
 @app.get("/admin/approvals", response_class=HTMLResponse)
 async def admin_approvals(request: Request):
-    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+    # Mock data for pending admins
+    pending_admins = [
+        {"id": "a001", "username": "tutor_minh", "email": "minh.nguyen@example.com", "created_at": "2023-10-10 08:30", "status": "pending"},
+        {"id": "a002", "username": "ta_hoa", "email": "hoa.tran@example.com", "created_at": "2023-10-11 14:15", "status": "pending"},
+         {"id": "a003", "username": "lab_assist_b", "email": "assist.b@example.com", "created_at": "2023-10-12 09:00", "status": "pending"},
+    ]
+    return templates.TemplateResponse("admin/approvals.html", {"request": request, "pending_admins": pending_admins})
+
+# API endpoints for admin approvals (Mock)
+@app.post("/api/v1/admin/approve/{admin_id}")
+async def approve_admin(admin_id: str):
+    # TODO: Implement DB update logic here
+    return {"status": "success", "message": f"Admin {admin_id} approved"}
+
+@app.delete("/api/v1/admin/reject/{admin_id}")
+async def reject_admin(admin_id: str):
+    # TODO: Implement DB delete logic here
+    return {"status": "success", "message": f"Admin request {admin_id} rejected"}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", port=8000, reload=True)
