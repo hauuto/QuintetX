@@ -66,7 +66,14 @@ async def admin_teams(request: Request):
 
 @app.get("/admin/rooms", response_class=HTMLResponse)
 async def admin_rooms(request: Request):
-    return templates.TemplateResponse("admin/placeholder.html", {"request": request})
+    # Mock data for rooms
+    rooms = [
+        {"id": "1001", "name": "Room A-01", "team1": "Dragon Slayer", "team2": "Code Warriors", "status": "Đang diễn ra"},
+        {"id": "1002", "name": "Room B-02", "team1": "AI Masters", "team2": "Gomoku Pros", "status": "Kết thúc"},
+        {"id": "1003", "name": "Room C-03", "team1": "Strategy Kings", "team2": None, "status": "Chờ người chơi"},
+        {"id": "1004", "name": "Trận Chung Kết", "team1": None, "team2": None, "status": "Chờ người chơi"},
+    ]
+    return templates.TemplateResponse("admin/rooms.html", {"request": request, "rooms": rooms})
 
 @app.get("/admin/match", response_class=HTMLResponse)
 async def admin_match(request: Request):
