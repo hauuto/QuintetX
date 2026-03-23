@@ -493,3 +493,17 @@ static/
 - When a group is deleted, all its members' `group_id` must be set to null. user can not be deleted at any cost. If a user needs to be "removed", their account must be deactivated by setting a field `is_active` to false (this field must be added to the `users` collection). Deactivated users cannot log in or join groups, but their historical data (matches, group memberships) must be preserved for record-keeping.
 - When a match is created, both teams must be assigned valid `team_id` and `api_key` values that do not conflict with any existing matches. Each team can only participate in one active match at a time.
 - The `board` field in the `matches` collection must always be a 40x40 array of integers, where 0 represents an empty cell, 1 represents a cell occupied by player X, and 2 represents a cell occupied by player O. The server must validate that any move made by an agent updates the board correctly according to these rules.
+
+# NOTIFICATIONS
+- table `notifications`:
+```json
+{
+    "_id": "string",
+    "user_id": "string",
+    "sender_id": "string | SYSTEM (for system-generated notifications)",
+    "type": "urgent | info | warning",
+    "message": "string",
+    "is_read": false,
+    "created_at": "timestamp",
+    "link": "string | null (URL to related page)"
+}

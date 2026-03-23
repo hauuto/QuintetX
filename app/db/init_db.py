@@ -8,12 +8,14 @@ from app.db.client import get_database
 from app.db.validators import (
     GROUPS_SCHEMA_VALIDATOR,
     MATCHES_SCHEMA_VALIDATOR,
+    NOTIFICATIONS_SCHEMA_VALIDATOR,
     USERS_SCHEMA_VALIDATOR,
 )
 
 USERS_COLLECTION = "users"
 GROUPS_COLLECTION = "groups"
 MATCHES_COLLECTION = "matches"
+NOTIFICATIONS_COLLECTION = "notifications"
 
 SEED_ROOM_NAME = "Test"
 SEED_USER_MSSV_LIST = ["23012345", "23012346", "23012347"]
@@ -120,6 +122,11 @@ async def _ensure_collections(database: Any) -> None:
         await database.create_collection(GROUPS_COLLECTION, validator=GROUPS_SCHEMA_VALIDATOR)
     if MATCHES_COLLECTION not in existing_collections:
         await database.create_collection(MATCHES_COLLECTION, validator=MATCHES_SCHEMA_VALIDATOR)
+    if NOTIFICATIONS_COLLECTION not in existing_collections:
+        await database.create_collection(
+            NOTIFICATIONS_COLLECTION,
+            validator=NOTIFICATIONS_SCHEMA_VALIDATOR,
+        )
 
 
 async def _apply_collection_validators(database: Any) -> None:
@@ -139,6 +146,12 @@ async def _apply_collection_validators(database: Any) -> None:
         "collMod",
         MATCHES_COLLECTION,
         validator=MATCHES_SCHEMA_VALIDATOR,
+        validationLevel="moderate",
+    )
+    await database.command(
+        "collMod",
+        NOTIFICATIONS_COLLECTION,
+        validator=NOTIFICATIONS_SCHEMA_VALIDATOR,
         validationLevel="moderate",
     )
 
@@ -174,6 +187,16 @@ async def _ensure_indexes(database: Any) -> None:
         name="uq_active_team_o",
         unique=True,
         partialFilterExpression={"status": {"$in": ["waiting", "playing"]}},
+    )
+
+    await database[NOTIFICATIONS_COLLECTION].create_index(
+        [("user_id", 1), ("is_read", 1), ("created_at", -1)],
+        name="idx_notifications_user_read_created",
+    )
+
+    await database[NOTIFICATIONS_COLLECTION].create_index(
+        [("status", 1), ("type", 1)],
+        name="idx_notifications_status_type",
     )
 
 

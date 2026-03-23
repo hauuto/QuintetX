@@ -6,6 +6,7 @@ REGEX_USER_ID = r"^(U\d{8}|A\d{4})$"
 REGEX_GROUP_ID = r"^T\d{4}[a-zA-Z0-9]{8}$"
 REGEX_MATCH_ID = r"^M\d{4}[a-zA-Z0-9]{8}$"
 REGEX_GROUP_CODE = r"^GRP-[A-Z0-9]{4}$"
+REGEX_NOTIFICATION_ID = r"^N\d{4}[a-zA-Z0-9]{8}$"
 
 USERS_SCHEMA_VALIDATOR = {
     "$jsonSchema": {
@@ -196,6 +197,48 @@ MATCHES_SCHEMA_VALIDATOR = {
                     "additionalProperties": False,
                 },
             },
+            "created_at": {"bsonType": "date"},
+        },
+        "additionalProperties": False,
+    }
+}
+
+NOTIFICATIONS_SCHEMA_VALIDATOR = {
+    "$jsonSchema": {
+        "bsonType": "object",
+        "required": [
+            "_id",
+            "user_id",
+            "sender_id",
+            "type",
+            "message",
+            "is_read",
+            "created_at",
+            "status",
+            "link",
+        ],
+        "properties": {
+            "_id": {"bsonType": "string", "pattern": REGEX_NOTIFICATION_ID},
+            "user_id": {"bsonType": "string", "pattern": REGEX_USER_ID},
+            "sender_id": {"bsonType": "string"},
+            "type": {
+                "enum": [
+                    "invite",
+                    "join_request",
+                    "join_approved",
+                    "join_rejected",
+                    "invite_accepted",
+                    "invite_rejected",
+                    "kicked",
+                    "info",
+                ]
+            },
+            "message": {"bsonType": "string", "minLength": 1},
+            "is_read": {"bsonType": "bool"},
+            "status": {"enum": ["pending", "accepted", "rejected", "sent"]},
+            "group_id": {"bsonType": ["string", "null"], "pattern": REGEX_GROUP_ID},
+            "link": {"bsonType": ["string", "null"]},
+            "metadata": {"bsonType": "object"},
             "created_at": {"bsonType": "date"},
         },
         "additionalProperties": False,

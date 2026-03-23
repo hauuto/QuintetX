@@ -5,8 +5,8 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from app.api.auth import router as auth_router
+from app.api.groups import router as groups_router
 from app.core.config import settings
-from app.core.mock_data import mock_db
 from app.db.client import close_db, connect_db, get_database
 from app.db.init_db import (
     GROUPS_COLLECTION,
@@ -46,6 +46,25 @@ app = FastAPI(
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(auth_router)
+app.include_router(groups_router)
+
+EMPTY_MATCH = {
+    "id": "",
+    "room_name": "",
+    "status": "waiting",
+    "time_elapsed": "00:00",
+    "teams": {
+        "X": {"team_id": "", "name": "Đội X", "is_connected": False},
+        "O": {"team_id": "", "name": "Đội O", "is_connected": False},
+    },
+    "history": [],
+}
+
+EMPTY_TEAM = {
+    "id": "",
+    "name": "",
+    "api_key": "",
+}
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -61,36 +80,23 @@ async def register_page(request: Request):
 
 @app.get("/student/dashboard", response_class=HTMLResponse)
 async def student_dashboard(request: Request):
-    # Simulate fetching logged-in user's team data
-    team = mock_db["teams"][0]
-    recent_matches = mock_db["matches"][:5]
-    return templates.TemplateResponse("student/dashboard.html", {
-        "request": request,
-        "team": team,
-        "matches": recent_matches,
-        "stats": team["stats"]
-    })
+    return templates.TemplateResponse("student/dashboard.html", {"request": request})
 
 @app.get("/student/team", response_class=HTMLResponse)
 async def student_team(request: Request):
-    team = mock_db["teams"][0]
-    return templates.TemplateResponse("student/team.html", {"request": request, "team": team})
+    return templates.TemplateResponse("student/team.html", {"request": request})
 
 @app.get("/student/match", response_class=HTMLResponse)
 async def student_match(request: Request):
-    match_data = mock_db["matches"][0] # Example match
-    # Or use the "current_match" mock
-    current_match = mock_db["current_match"]
     return templates.TemplateResponse("student/match.html", {
         "request": request,
-        "match": current_match,
-        "team": mock_db["teams"][0]
+        "match": EMPTY_MATCH,
+        "team": EMPTY_TEAM,
     })
 
 @app.get("/student/history", response_class=HTMLResponse)
 async def student_history(request: Request):
-    matches = mock_db["matches"]
-    return templates.TemplateResponse("student/history.html", {"request": request, "matches": matches})
+    return templates.TemplateResponse("student/history.html", {"request": request, "matches": []})
 
 @app.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
@@ -98,17 +104,14 @@ async def admin_login_page(request: Request):
 
 @app.get("/admin/dashboard", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
-    # Calculate some stats for admin
-    total_teams = len(mock_db["teams"])
-    total_matches = len(mock_db["matches"]) + 20 # Fake more matches
     return templates.TemplateResponse("admin/dashboard.html", {
         "request": request,
         "stats": {
-            "teams": total_teams,
-            "matches": total_matches,
-            "rooms": 3,
-            "pending": 2
-        }
+            "teams": 0,
+            "matches": 0,
+            "rooms": 0,
+            "pending": 0,
+        },
     })
 
 # Placeholder routes for sidebar links
@@ -138,8 +141,7 @@ async def admin_rooms(request: Request):
 
 @app.get("/admin/match", response_class=HTMLResponse)
 async def admin_match(request: Request):
-    current_match = mock_db["current_match"]
-    return templates.TemplateResponse("admin/match.html", {"request": request, "match": current_match})
+    return templates.TemplateResponse("admin/match.html", {"request": request, "match": EMPTY_MATCH})
 
 @app.get("/admin/approvals", response_class=HTMLResponse)
 async def admin_approvals(request: Request):

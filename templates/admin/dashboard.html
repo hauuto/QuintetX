@@ -1,7 +1,28 @@
 {% extends "admin/base_admin.html" %}
 
 {% block admin_content %}
-<div class="w-full max-w-7xl mx-auto space-y-8">
+<div
+    class="w-full max-w-7xl mx-auto space-y-8"
+    x-data="{
+        currentUser: { full_name: 'Administrator', role: 'admin' },
+        initUser() {
+            try {
+                const raw = localStorage.getItem('qx_user');
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.full_name) {
+                    this.currentUser = {
+                        full_name: parsed.full_name,
+                        role: parsed.role || 'admin',
+                    };
+                }
+            } catch (error) {
+                // Keep fallback labels.
+            }
+        }
+    }"
+    x-init="initUser()"
+>
     {% set stats_data = stats if stats is defined and stats else {} %}
 
     <!-- Header -->
@@ -10,6 +31,10 @@
             Tổng quan
             <span class="absolute -bottom-1 left-0 w-1/3 h-1 bg-[#3547E5] rounded-full"></span>
         </h1>
+        <p class="mt-2 text-sm text-gray-600">
+            Xin chao <span class="font-bold text-gray-900" x-text="currentUser.full_name"></span>,
+            bang dieu khien da san sang cho lenh moi.
+        </p>
     </div>
 
     {% if not stats_data %}
