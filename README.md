@@ -132,6 +132,12 @@ poetry add --group dev pytest
 poetry remove requests
 ```
 
+## API Auth Requests
+
+Tai lieu request/response cho dang ky, dang nhap:
+
+- docs/auth-api.md
+
 ## Cấu trúc dự án
 
 ```
