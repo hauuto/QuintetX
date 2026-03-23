@@ -31,6 +31,49 @@ You are an expert Full-Stack Web Developer and System Architect. Your task is to
 # DATABASE SCHEMA (MongoDB - Async)
 All DB calls must use `motor.motor_asyncio`.
 
+## Collection: `users`
+```json
+{
+    "_id": "uuid_string",
+    "mssv": "string (unique)",
+    "full_name": "string",
+    "password_hash": "string",
+    "role": "student | admin",
+    "group_id": "uuid_string | null",
+    "created_at": "timestamp"
+}
+```
+
+## Collection: `groups`
+```json
+{
+    "_id": "uuid_string",
+    "group_code": "string (unique, auto-generated, e.g. GRP-A3F9)",
+    "name": "string",
+    "description": "string",
+    "avatar_url": "string | null",
+    "is_public": true,
+    "leader_id": "uuid_string",
+    "members": [
+        { "user_id": "uuid_string", "mssv": "string", "full_name": "string", "joined_at": "timestamp" }
+    ],
+    "pending_requests": [
+        { "user_id": "uuid_string", "mssv": "string", "full_name": "string", "requested_at": "timestamp" }
+    ],
+    "match_history": [
+        { "match_id": "uuid_string", "opponent_group_id": "string", "result": "win | loss | draw", "played_at": "timestamp" }
+    ],
+    "stats": { "total": 0, "wins": 0, "losses": 0, "draws": 0 },
+    "created_at": "timestamp"
+}
+```
+
+**Constraints:**
+- `members` array tối đa **6 phần tử** (bao gồm nhóm trưởng)
+- Một sinh viên chỉ thuộc **1 nhóm** tại một thời điểm (`users.group_id`)
+- `group_code` được tự động sinh khi tạo nhóm, không thể chỉnh sửa
+- `pending_requests` chỉ tồn tại khi `is_public = false` (nhóm riêng tư yêu cầu duyệt đơn)
+
 ## Collection: `matches`
 ```json
 {
@@ -74,7 +117,62 @@ Security: Agents must send `X-API-Key` and `X-Team-ID` in request headers.
   - Run 5-in-a-row check (Horizontal, Vertical, Diagonal) after each move
   - If win detected, set `status = "finished"` and `winner = SIDE`
 
-## Agent Health Check
+## Group Management API (`/api/v1/groups`)
+
+Tất cả endpoint yêu cầu JWT Bearer token của sinh viên đã đăng nhập.
+
+### Tạo & Xem nhóm
+
+**`POST /api/v1/groups`** — Tạo nhóm mới
+- Chỉ được tạo nếu sinh viên **chưa thuộc nhóm nào** (`users.group_id == null`)
+- Body: `{ "name": str, "description": str, "avatar_url": str | null, "is_public": bool }`
+- Tự động: set `leader_id = current_user.id`, thêm user vào `members`, sinh `group_code`, cập nhật `users.group_id`
+
+**`GET /api/v1/groups`** — Danh sách nhóm công khai (`is_public = true`)
+
+**`GET /api/v1/groups/{group_id}`** — Chi tiết nhóm (public info)
+
+**`GET /api/v1/groups/me`** — Thông tin nhóm hiện tại của người dùng đang đăng nhập
+
+### Quyền Nhóm trưởng
+
+> Các endpoint sau chỉ nhận request từ `leader_id` của nhóm. Trả về `403` nếu không phải nhóm trưởng.
+
+**`PATCH /api/v1/groups/{group_id}`** — Chỉnh sửa thông tin nhóm
+- Body (partial update): `{ "name"?, "description"?, "avatar_url"?, "is_public"? }`
+
+**`DELETE /api/v1/groups/{group_id}`** — Xóa nhóm
+- Xóa nhóm, reset `group_id = null` cho tất cả thành viên
+
+**`POST /api/v1/groups/{group_id}/invite`** — Mời thành viên bằng MSSV
+- Body: `{ "mssv": str }`
+- Validation: nhóm chưa đủ 6 người, sinh viên được mời chưa có nhóm
+- Gửi invite (thêm trực tiếp vào `members`, không qua pending)
+
+**`POST /api/v1/groups/{group_id}/requests/{user_id}/approve`** — Duyệt đơn xin vào nhóm
+- Chuyển từ `pending_requests` → `members`
+- Validation: nhóm chưa đủ 6 người
+
+**`POST /api/v1/groups/{group_id}/requests/{user_id}/reject`** — Từ chối đơn xin vào nhóm
+- Xóa khỏi `pending_requests`
+
+**`DELETE /api/v1/groups/{group_id}/members/{user_id}`** — Kick thành viên
+- Không thể kick chính mình (nhóm trưởng)
+- Reset `users.group_id = null` cho thành viên bị kick
+
+### Quyền Thành viên
+
+**`POST /api/v1/groups/{group_id}/join`** — Xin vào nhóm công khai/riêng tư
+- Nếu `is_public = true`: thêm thẳng vào `members` (nếu còn chỗ)
+- Nếu `is_public = false`: thêm vào `pending_requests`, chờ nhóm trưởng duyệt
+
+**`POST /api/v1/groups/{group_id}/leave`** — Rời nhóm
+- Nhóm trưởng **không thể rời** (phải xóa nhóm hoặc chuyển quyền — hiện chưa hỗ trợ chuyển quyền)
+- Reset `users.group_id = null`
+
+---
+
+
 
 **Endpoint**: `POST /api/v1/agent/heartbeat`
 - Agent gửi heartbeat định kỳ mỗi **5 giây** (cấu hình qua `HEARTBEAT_INTERVAL` trong `config.py`)
@@ -216,19 +314,36 @@ class QuintetXClient:
 
 # AUTHENTICATION
 - **Student Login**: MSSV + Password
-- **Student Register**: MSSV + Họ tên + Lớp + Password + Confirm Password
+- **Student Register**: MSSV + Họ tên + Password + Confirm Password
 - **Admin Login**: Separate route, Username/Email + Password
 
 ---
 
 # ROLE-BASED VIEWS
 
-## Student (read-only)
-Sidebar: Tổng quan · Đội của tôi · Trận đấu · Lịch sử
+## Student (read-only for matches, interactive for group)
+Sidebar: Tổng quan · Nhóm của tôi · Trận đấu · Lịch sử
 
-### Đội của tôi
-- Team name + ID (read-only)
-- Member list: avatar + name + MSSV only
+### Nhóm của tôi
+
+**Trường hợp chưa có nhóm:**
+- Nút "Tạo nhóm" → mở form: Tên nhóm, Mô tả, Ảnh nhóm (upload), Công khai/Riêng tư
+- Nút "Tìm nhóm" → danh sách nhóm công khai, mỗi nhóm có nút "Xin vào"
+
+**Trường hợp đã có nhóm — view thường (thành viên):**
+- Hiển thị: Tên nhóm, Mã định danh (`group_code`), Ảnh nhóm, Mô tả
+- Danh sách thành viên: avatar + họ tên + MSSV + badge "Nhóm trưởng" nếu là leader
+- Nút "Rời nhóm" (chỉ hiện với thành viên, không phải nhóm trưởng)
+- Lịch sử trận đấu của nhóm: bảng STT · Đối thủ · Kết quả · Thời gian
+- Stat cards: Tổng trận · Thắng · Thua · Hòa
+
+**Trường hợp đã có nhóm — view nhóm trưởng (thêm các control sau):**
+- Nút "Chỉnh sửa nhóm" → inline form sửa tên, mô tả, ảnh, công khai/riêng tư
+- Toggle "Công khai / Riêng tư" — hiển thị rõ trạng thái hiện tại
+- Nút "Mời thành viên" → input MSSV + nút gửi (disable nếu nhóm đã đủ 3 người)
+- Danh sách đơn chờ duyệt (chỉ hiện khi `is_public = false`): họ tên + MSSV + nút Duyệt / Từ chối
+- Mỗi thành viên (không phải nhóm trưởng) có thêm nút "Kick"
+- Nút "Xóa nhóm" — destructive action, cần confirm dialog
 
 ### Trận đấu
 - 40x40 board (read-only)
@@ -237,12 +352,17 @@ Sidebar: Tổng quan · Đội của tôi · Trận đấu · Lịch sử
 - Playback toolbar: **HIDDEN**
 
 ### Tổng quan (Dashboard)
-- Team info card (name, ID, members)
-- Stat cards: Tổng trận đấu · Thắng · Thua
+- Group info card: tên nhóm, mã nhóm (`group_code`), số thành viên / 3
+- Stat cards: Tổng trận đấu · Thắng · Thua · Hòa
 - Recent match history table (5 rows): STT · Đối thủ · Kết quả · Thời gian
+- Nếu chưa có nhóm: hiển thị card nhắc "Bạn chưa thuộc nhóm nào" với nút "Tạo nhóm"
 
 ## Admin (full control)
 Sidebar: Tổng quan · Quản Lý Nhóm · Quản Lý Phòng · Trận đấu · Xét duyệt Admin
+
+### Quản Lý Nhóm
+- Bảng danh sách tất cả nhóm: Mã nhóm · Tên nhóm · Số thành viên · Công khai/Riêng tư · Trạng thái
+- Có thể xem chi tiết, xem lịch sử trận đấu, và xóa bất kỳ nhóm nào
 
 ### Trận đấu
 - Full playback toolbar (play/pause/seek/speed)

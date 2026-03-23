@@ -1,19 +1,51 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from app.api.auth import router as auth_router
 from app.core.config import settings
 from app.core.mock_data import mock_db
+from app.db.client import close_db, connect_db, get_database
+from app.db.init_db import (
+    GROUPS_COLLECTION,
+    MATCHES_COLLECTION,
+    SEED_GROUP_CODE_LIST,
+    SEED_ROOM_NAME,
+    SEED_USER_MSSV_LIST,
+    USERS_COLLECTION,
+    initialize_local_database,
+)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    try:
+        await connect_db()
+        await initialize_local_database()
+    except Exception as exc:
+        # Fail fast on startup when local MongoDB is unavailable or initialization fails.
+        raise RuntimeError(
+            "MongoDB startup initialization failed. "
+            "Ensure local MongoDB is running and MONGODB_URI is correct."
+        ) from exc
+
+    yield
+
+    await close_db()
 
 app = FastAPI(
     title=settings.APP_NAME,
     description="Competitive Gomoku Platform",
     version=settings.VERSION,
-    debug=settings.DEBUG
+    debug=settings.DEBUG,
+    lifespan=lifespan,
 )
 
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.include_router(auth_router)
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -129,6 +161,80 @@ async def approve_admin(admin_id: str):
 async def reject_admin(admin_id: str):
     # TODO: Implement DB delete logic here
     return {"status": "success", "message": f"Admin request {admin_id} rejected"}
+
+
+@app.get("/api/v1/system/db/health")
+async def db_health_check():
+    try:
+        database = get_database()
+        ping_result = await database.command("ping")
+        collections = sorted(await database.list_collection_names())
+
+        return {
+            "status": "success",
+            "data": {
+                "database": settings.DATABASE_NAME,
+                "ping_ok": bool(ping_result.get("ok") == 1.0),
+                "collections": collections,
+            },
+            "message": "",
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "data": {
+                "database": settings.DATABASE_NAME,
+                "ping_ok": False,
+            },
+            "message": f"Database unavailable: {exc}",
+        }
+
+
+@app.get("/api/v1/system/db/seed-test")
+async def db_seed_test():
+    try:
+        database = get_database()
+
+        seeded_users = await database[USERS_COLLECTION].count_documents(
+            {"mssv": {"$in": SEED_USER_MSSV_LIST}}
+        )
+        seeded_groups = await database[GROUPS_COLLECTION].count_documents(
+            {"group_code": {"$in": SEED_GROUP_CODE_LIST}}
+        )
+        test_room_matches = await database[MATCHES_COLLECTION].count_documents(
+            {"room_name": SEED_ROOM_NAME}
+        )
+
+        checks = {
+            "users_seeded": seeded_users == 3,
+            "groups_seeded": seeded_groups == 2,
+            "matches_seeded": test_room_matches == 0,
+        }
+        passed = all(checks.values())
+
+        return {
+            "status": "success" if passed else "error",
+            "data": {
+                "expected": {
+                    "users": 3,
+                    "groups": 2,
+                    "matches_room_test": 0,
+                },
+                "actual": {
+                    "users": seeded_users,
+                    "groups": seeded_groups,
+                    "matches_room_test": test_room_matches,
+                },
+                "checks": checks,
+            },
+            "message": "" if passed else "Seed validation failed",
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "data": {},
+            "message": f"Seed test failed: {exc}",
+        }
 
 if __name__ == "__main__":
     import uvicorn

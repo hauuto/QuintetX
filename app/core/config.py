@@ -11,8 +11,14 @@ class Settings(BaseSettings):
     TIME_PER_MOVE: float = 0.5
 
     # Database Settings
-    DB_NAME: str = "quintetx"
-    # MONGODB_URI: str = "mongodb://localhost:27017" # Uncomment when DB is ready
+    MONGODB_URI: str = "mongodb://localhost:27017"
+    DATABASE_NAME: str = "quintetx"
+    MONGODB_SERVER_SELECTION_TIMEOUT_MS: int = 60000
+
+    # Agent Heartbeat Settings
+    HEARTBEAT_INTERVAL: float = 5.0
+    HEARTBEAT_TIMEOUT: float = 15.0
+    HEARTBEAT_CHECK_INTERVAL: float = 3.0
 
     # Security (Placeholders)
     SECRET_KEY: str = "change_this_to_a_secure_random_string"
