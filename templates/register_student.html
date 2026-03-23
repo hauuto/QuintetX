@@ -7,31 +7,58 @@
 
     <!-- Logo Section -->
     <div class="text-center mb-8">
-        <h1 class="text-5xl font-extrabold text-quintet-blue tracking-tighter cursor-pointer" onclick="window.location.href='/'">QuintetX</h1>
+        <h1 class="text-5xl font-extrabold text-quintet-blue tracking-tighter cursor-pointer"
+            onclick="window.location.href='/'">QuintetX</h1>
     </div>
 
     <!-- Register Card -->
-    <div class="bg-white p-8 md:p-10 rounded-2xl shadow-xl w-full max-w-lg border border-gray-100"
-         x-data="{
+    <div class="bg-white p-8 md:p-10 rounded-2xl shadow-xl w-full max-w-lg border border-gray-100" x-data="{
              mssv: '',
              fullname: '',
              classroom: '',
              password: '',
              confirmPassword: '',
              isLoading: false,
-             register() {
+             errorMessage: '',
+             successMessage: '',
+             async register() {
+                 this.errorMessage = '';
+                 this.successMessage = '';
                  this.isLoading = true;
                  if(this.password !== this.confirmPassword) {
-                     alert('Mật khẩu không khớp!');
+                     this.errorMessage = 'Mật khẩu không khớp.';
                      this.isLoading = false;
                      return;
                  }
-                 // Simulate API call
-                 console.log('Register attempt:', this.mssv, this.fullname);
-                 setTimeout(() => {
+
+                 try {
+                     const response = await fetch('/api/v1/auth/register/student', {
+                         method: 'POST',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify({
+                             mssv: this.mssv.trim(),
+                             full_name: this.fullname.trim(),
+                             class_name: this.classroom.trim(),
+                             password: this.password,
+                             confirm_password: this.confirmPassword,
+                         }),
+                     });
+
+                     const result = await response.json();
+                     if (!response.ok || result.status !== 'success') {
+                         this.errorMessage = result.message || 'Đăng ký thất bại. Vui lòng thử lại.';
+                         return;
+                     }
+
+                     this.successMessage = 'Đăng ký thành công. Chuyển sang trang đăng nhập...';
+                     setTimeout(() => {
+                         window.location.href = '/login';
+                     }, 900);
+                 } catch (error) {
+                     this.errorMessage = 'Không thể kết nối server. Vui lòng thử lại sau.';
+                 } finally {
                      this.isLoading = false;
-                     // Redirect or show success
-                 }, 1000);
+                 }
              }
          }">
 
@@ -52,13 +79,9 @@
                 <label class="block text-gray-700 text-xs font-bold mb-2 uppercase tracking-widest" for="mssv">
                     Mã số sinh viên
                 </label>
-                <input
-                    x-model="mssv"
+                <input x-model="mssv"
                     class="w-full bg-gray-100 text-gray-900 font-semibold rounded-lg py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:ring-2 focus:ring-quintet-blue transition-all duration-200"
-                    id="mssv"
-                    type="text"
-                    required
-                >
+                    id="mssv" type="text" required>
             </div>
 
             <!-- Full Name Input -->
@@ -66,27 +89,19 @@
                 <label class="block text-gray-700 text-xs font-bold mb-2 uppercase tracking-widest" for="fullname">
                     Họ và tên
                 </label>
-                <input
-                    x-model="fullname"
+                <input x-model="fullname"
                     class="w-full bg-gray-100 text-gray-900 font-semibold rounded-lg py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:ring-2 focus:ring-quintet-blue transition-all duration-200"
-                    id="fullname"
-                    type="text"
-                    required
-                >
+                    id="fullname" type="text" required>
             </div>
 
-             <!-- Class Input -->
-             <div class="mb-5">
+            <!-- Class Input -->
+            <div class="mb-5">
                 <label class="block text-gray-700 text-xs font-bold mb-2 uppercase tracking-widest" for="classroom">
                     Lớp
                 </label>
-                <input
-                    x-model="classroom"
+                <input x-model="classroom"
                     class="w-full bg-gray-100 text-gray-900 font-semibold rounded-lg py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:ring-2 focus:ring-quintet-blue transition-all duration-200"
-                    id="classroom"
-                    type="text"
-                    required
-                >
+                    id="classroom" type="text" required>
             </div>
 
             <!-- Password Input -->
@@ -94,34 +109,29 @@
                 <label class="block text-gray-700 text-xs font-bold mb-2 uppercase tracking-widest" for="password">
                     Mật khẩu
                 </label>
-                <input
-                    x-model="password"
+                <input x-model="password"
                     class="w-full bg-gray-100 text-gray-900 font-semibold rounded-lg py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:ring-2 focus:ring-quintet-blue transition-all duration-200"
-                    id="password"
-                    type="password"
-                    required
-                >
+                    id="password" type="password" required>
             </div>
 
             <!-- Confirm Password Input -->
             <div class="mb-4">
-                <label class="block text-gray-700 text-xs font-bold mb-2 uppercase tracking-widest" for="confirmPassword">
+                <label class="block text-gray-700 text-xs font-bold mb-2 uppercase tracking-widest"
+                    for="confirmPassword">
                     Xác nhận mật khẩu
                 </label>
-                <input
-                    x-model="confirmPassword"
+                <input x-model="confirmPassword"
                     class="w-full bg-gray-100 text-gray-900 font-semibold rounded-lg py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:ring-2 focus:ring-quintet-blue transition-all duration-200"
-                    id="confirmPassword"
-                    type="password"
-                    required
-                >
-                <p x-show="password !== confirmPassword && confirmPassword.length > 0" class="text-red-500 text-xs mt-1" x-cloak>Mật khẩu không khớp</p>
+                    id="confirmPassword" type="password" required>
+                <p x-show="password !== confirmPassword && confirmPassword.length > 0" class="text-red-500 text-xs mt-1"
+                    x-cloak>Mật khẩu không khớp</p>
             </div>
 
             <!-- Warning Text -->
             <div class="mb-8 text-center bg-red-50 border border-red-200 p-2 rounded-lg">
                 <p class="text-red-600 font-medium text-sm">
-                    Lưu ý: vui lòng điền đúng thông tin vì các thông tin này sẽ gắn liền với điểm số môn học phần của bạn.
+                    Lưu ý: vui lòng điền đúng thông tin vì các thông tin này sẽ gắn liền với điểm số môn học phần của
+                    bạn.
                 </p>
             </div>
 
@@ -129,15 +139,16 @@
             <div class="flex items-center justify-between">
                 <button
                     class="w-full bg-quintet-blue hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg focus:outline-none focus:shadow-outline uppercase tracking-wider transition-colors duration-200 flex justify-center items-center"
-                    type="submit"
-                    :disabled="isLoading"
-                    :class="{ 'opacity-70 cursor-not-allowed': isLoading }"
-                >
+                    type="submit" :disabled="isLoading" :class="{ 'opacity-70 cursor-not-allowed': isLoading }">
                     <span x-show="!isLoading">Đăng ký</span>
                     <span x-show="isLoading" class="flex items-center" x-cloak>
-                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg"
+                            fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
                         </svg>
                         Đang xử lý...
                     </span>
@@ -146,10 +157,16 @@
 
             <!-- Login Link -->
             <div class="text-center mt-6">
-                <a class="inline-block align-baseline font-bold text-sm text-quintet-blue hover:text-blue-800 transition-colors duration-200" href="/login">
+                <a class="inline-block align-baseline font-bold text-sm text-quintet-blue hover:text-blue-800 transition-colors duration-200"
+                    href="/login">
                     Đã có tài khoản? Đăng nhập ngay
                 </a>
             </div>
+
+            <p x-show="errorMessage" x-text="errorMessage" x-cloak
+                class="mt-4 text-sm font-semibold text-red-600 text-center"></p>
+            <p x-show="successMessage" x-text="successMessage" x-cloak
+                class="mt-4 text-sm font-semibold text-green-600 text-center"></p>
 
         </form>
     </div>
