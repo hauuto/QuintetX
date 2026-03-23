@@ -18,12 +18,12 @@
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Tên Đội</span>
-                    <h2 class="text-3xl font-extrabold text-[#3547E5] mt-1">Dragon Slayers</h2>
+                    <h2 class="text-3xl font-extrabold text-[#3547E5] mt-1">{{ team.name }}</h2>
                 </div>
                 <div class="flex items-center bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
                     <div class="mr-4 text-right">
                         <span class="block text-xs font-bold text-gray-400 uppercase">Team ID</span>
-                        <span class="block text-lg font-mono font-bold text-gray-900">TEAM-007</span>
+                        <span class="block text-lg font-mono font-bold text-gray-900">{{ team.id }}</span>
                     </div>
                 </div>
             </div>
@@ -33,42 +33,22 @@
         <div class="p-8">
             <h3 class="text-lg font-bold text-gray-900 mb-6 flex items-center">
                 Danh sách thành viên
-                <span class="ml-3 bg-gray-100 text-gray-600 text-xs font-bold px-2.5 py-0.5 rounded-full">3</span>
+                <span class="ml-3 bg-gray-100 text-gray-600 text-xs font-bold px-2.5 py-0.5 rounded-full">{{ team.members|length }}</span>
             </h3>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Member Card 1 -->
+                {% for member in team.members %}
+                <!-- Member Card -->
                 <div class="flex items-center p-4 bg-white border border-gray-100 rounded-lg hover:shadow-md transition-shadow">
                     <div class="h-12 w-12 rounded-full bg-blue-100 text-[#3547E5] flex items-center justify-center font-bold text-lg">
-                        NA
+                        {{ member.initials }}
                     </div>
                     <div class="ml-4">
-                        <p class="text-sm font-bold text-gray-900">Nguyễn Văn A</p>
-                        <p class="text-xs text-gray-500 font-mono mt-0.5">20201234</p>
+                        <p class="text-sm font-bold text-gray-900">{{ member.name }}</p>
+                        <p class="text-xs text-gray-500 font-mono mt-0.5">{{ member.mssv }}</p>
                     </div>
                 </div>
-
-                <!-- Member Card 2 -->
-                <div class="flex items-center p-4 bg-white border border-gray-100 rounded-lg hover:shadow-md transition-shadow">
-                    <div class="h-12 w-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg">
-                        PL
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-bold text-gray-900">Phạm Thị Lan</p>
-                        <p class="text-xs text-gray-500 font-mono mt-0.5">20205678</p>
-                    </div>
-                </div>
-
-                <!-- Member Card 3 -->
-                <div class="flex items-center p-4 bg-white border border-gray-100 rounded-lg hover:shadow-md transition-shadow">
-                    <div class="h-12 w-12 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-lg">
-                        TH
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-bold text-gray-900">Trần Huy</p>
-                        <p class="text-xs text-gray-500 font-mono mt-0.5">20209012</p>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
         </div>
     </div>

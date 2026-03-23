@@ -17,7 +17,7 @@
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
             <div>
                 <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Tổng trận đấu</p>
-                <p class="text-3xl font-bold text-gray-900 mt-2">24</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.matches }}</p>
             </div>
             <div class="p-3 bg-blue-50 rounded-full text-[#3547E5]">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
@@ -28,7 +28,7 @@
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
             <div>
                 <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Thắng</p>
-                <p class="text-3xl font-bold text-gray-900 mt-2">18</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.wins }}</p>
             </div>
             <div class="p-3 bg-green-50 rounded-full text-green-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -39,7 +39,7 @@
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
             <div>
                 <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Thua</p>
-                <p class="text-3xl font-bold text-gray-900 mt-2">6</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.losses }}</p>
             </div>
             <div class="p-3 bg-red-50 rounded-full text-red-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -53,19 +53,19 @@
         <div class="flex items-start justify-between">
             <div>
                 <p class="text-sm text-gray-500 mb-1">Tên đội</p>
-                <p class="text-xl font-bold text-[#3547E5]">Dragon Slayers</p>
+                <p class="text-xl font-bold text-[#3547E5]">{{ team.name }}</p>
             </div>
             <div class="text-right">
                 <p class="text-sm text-gray-500 mb-1">ID Đội</p>
-                <p class="text-lg font-mono font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded">TEAM-007</p>
+                <p class="text-lg font-mono font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded">{{ team.id }}</p>
             </div>
         </div>
         <div class="mt-6">
             <p class="text-sm text-gray-500 mb-3">Thành viên</p>
             <div class="flex -space-x-2">
-                <div class="w-10 h-10 rounded-full bg-gray-300 border-2 border-white flex items-center justify-center text-xs font-bold text-gray-600">NV</div>
-                <div class="w-10 h-10 rounded-full bg-gray-300 border-2 border-white flex items-center justify-center text-xs font-bold text-gray-600">PL</div>
-                <div class="w-10 h-10 rounded-full bg-gray-300 border-2 border-white flex items-center justify-center text-xs font-bold text-gray-600">TH</div>
+                {% for member in team.members %}
+                <div class="w-10 h-10 rounded-full bg-gray-300 border-2 border-white flex items-center justify-center text-xs font-bold text-gray-600" title="{{ member.name }}">{{ member.initials }}</div>
+                {% endfor %}
             </div>
         </div>
     </div>
@@ -85,20 +85,29 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
+                {% for match in matches %}
                 <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="px-6 py-4 text-sm text-gray-600 font-mono">01</td>
-                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">Team Alpha</td>
-                    <td class="px-6 py-4"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span></td>
-                    <td class="px-6 py-4 text-sm text-gray-500 text-right">10:30 19/03</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 font-mono">{{ loop.index }}</td>
+                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">
+                        {% if match.teams.X.team_id == team.id %}
+                            {{ match.teams.O.name }}
+                        {% else %}
+                            {{ match.teams.X.name }}
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if match.winner == "X" and match.teams.X.team_id == team.id %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span>
+                        {% elif match.winner == "O" and match.teams.O.team_id == team.id %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span>
+                        {% else %}
+                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">Thua</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500 text-right">{{ match.start_time }}</td>
                 </tr>
-                <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="px-6 py-4 text-sm text-gray-600 font-mono">02</td>
-                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">Beta Squad</td>
-                    <td class="px-6 py-4"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">Thua</span></td>
-                    <td class="px-6 py-4 text-sm text-gray-500 text-right">09:15 19/03</td>
-                </tr>
-                <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="px-6 py-4 text-sm text-gray-600 font-mono">03</td>
+                {% endfor %}
+            </tbody>
                     <td class="px-6 py-4 text-sm font-semibold text-gray-900">Gamma Rays</td>
                     <td class="px-6 py-4"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span></td>
                     <td class="px-6 py-4 text-sm text-gray-500 text-right">08:00 19/03</td>

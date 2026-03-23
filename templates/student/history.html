@@ -27,50 +27,34 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 text-sm">
-                    <!-- History Item 1 -->
+                    {% for match in matches %}
+                    <!-- History Item -->
                     <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 text-gray-500 font-mono text-center">01</td>
-                        <td class="px-6 py-4 font-mono text-gray-600">#MATCH-8392</td>
-                        <td class="px-6 py-4 font-semibold text-gray-900">Team Alpha</td>
-                        <td class="px-6 py-4 text-center text-gray-600">42</td>
-                        <td class="px-6 py-4 text-center">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span>
+                        <td class="px-6 py-4 text-gray-500 font-mono text-center">{{ loop.index }}</td>
+                        <td class="px-6 py-4 font-mono text-gray-600">#{{ match.id }}</td>
+                        <td class="px-6 py-4 font-semibold text-gray-900">
+                             {% if match.teams.X.team_id == request.user_id %} <!-- Note: Assume request.user_id or similar context is available, for now hardcode comparison logic or just display raw -->
+                                {{ match.teams.O.name }}
+                            {% else %}
+                                {{ match.teams.X.name }}
+                            {% endif %}
                         </td>
-                        <td class="px-6 py-4 text-gray-500 text-right">10:30 19/03/2026</td>
+                        <td class="px-6 py-4 text-center text-gray-600">{{ match.move_count }}</td>
+                        <td class="px-6 py-4 text-center">
+                             {% if match.winner == "X" %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span>
+                            {% elif match.winner == "O" %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">Thua</span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-800">Hòa</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-gray-500 text-right">{{ match.start_time }}</td>
                         <td class="px-6 py-4 text-center">
                             <a href="#" class="text-[#3547E5] hover:underline font-medium">Xem lại</a>
                         </td>
                     </tr>
-
-                    <!-- History Item 2 -->
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 text-gray-500 font-mono text-center">02</td>
-                        <td class="px-6 py-4 font-mono text-gray-600">#MATCH-8341</td>
-                        <td class="px-6 py-4 font-semibold text-gray-900">Beta Squad</td>
-                        <td class="px-6 py-4 text-center text-gray-600">15</td>
-                        <td class="px-6 py-4 text-center">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">Thua</span>
-                        </td>
-                        <td class="px-6 py-4 text-gray-500 text-right">09:15 19/03/2026</td>
-                        <td class="px-6 py-4 text-center">
-                            <a href="#" class="text-[#3547E5] hover:underline font-medium">Xem lại</a>
-                        </td>
-                    </tr>
-
-                     <!-- History Item 3 -->
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 text-gray-500 font-mono text-center">03</td>
-                        <td class="px-6 py-4 font-mono text-gray-600">#MATCH-7201</td>
-                        <td class="px-6 py-4 font-semibold text-gray-900">Gamma Rays</td>
-                        <td class="px-6 py-4 text-center text-gray-600">88</td>
-                        <td class="px-6 py-4 text-center">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span>
-                        </td>
-                        <td class="px-6 py-4 text-gray-500 text-right">08:00 19/03/2026</td>
-                        <td class="px-6 py-4 text-center">
-                            <a href="#" class="text-[#3547E5] hover:underline font-medium">Xem lại</a>
-                        </td>
-                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
