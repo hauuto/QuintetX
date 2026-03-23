@@ -21,6 +21,10 @@ Tat ca response deu theo format:
 - URL: /api/v1/auth/register/student
 - Content-Type: application/json
 
+Rang buoc:
+- mssv phai dung 8 chu so, vi du 23012345
+- user.id duoc tao theo format U + mssv
+
 Request body:
 
 ```json
@@ -40,7 +44,7 @@ Success response:
   "status": "success",
   "data": {
     "user": {
-      "id": "0c4d4f5b-0bb2-42dc-bf43-7f0a8ccf7ec3",
+      "id": "U22123456",
       "mssv": "22123456",
       "full_name": "Nguyen Van A",
       "class_name": "D21CQCN01-N",
@@ -54,6 +58,7 @@ Success response:
 Error cases:
 - MSSV da ton tai
 - Password va confirm_password khong khop
+- MSSV sai dinh dang 8 chu so
 
 ## 2) Dang nhap sinh vien
 
@@ -93,6 +98,7 @@ Success response:
 
 Error cases:
 - Sai MSSV hoac password
+- Tai khoan da bi vo hieu hoa (is_active=false)
 
 ## 3) Dang nhap admin
 
@@ -131,6 +137,7 @@ Success response:
 Error cases:
 - Sai username_or_email hoac password
 - Tai khoan khong co role admin
+- Tai khoan da bi vo hieu hoa (is_active=false)
 
 ## Curl nhanh
 

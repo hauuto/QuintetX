@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from uuid import uuid4
 import secrets
+import re
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -13,10 +13,11 @@ from app.db.client import get_database
 from app.db.init_db import USERS_COLLECTION
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+MSSV_REGEX = re.compile(r"^\d{8}$")
 
 
 class StudentRegisterRequest(BaseModel):
-    mssv: str = Field(min_length=3, max_length=32)
+    mssv: str = Field(min_length=8, max_length=8)
     full_name: str = Field(min_length=1, max_length=120)
     class_name: str = Field(min_length=1, max_length=64)
     password: str = Field(min_length=6, max_length=128)
@@ -24,7 +25,7 @@ class StudentRegisterRequest(BaseModel):
 
 
 class StudentLoginRequest(BaseModel):
-    mssv: str = Field(min_length=3, max_length=32)
+    mssv: str = Field(min_length=8, max_length=8)
     password: str = Field(min_length=1, max_length=128)
 
 
@@ -42,6 +43,13 @@ async def register_student(payload: StudentRegisterRequest):
     mssv = _normalize_text(payload.mssv)
     full_name = _normalize_text(payload.full_name)
     class_name = _normalize_text(payload.class_name)
+
+    if not MSSV_REGEX.fullmatch(mssv):
+        return {
+            "status": "error",
+            "data": {},
+            "message": "MSSV must be exactly 8 digits",
+        }
 
     if payload.password != payload.confirm_password:
         return {
@@ -61,7 +69,7 @@ async def register_student(payload: StudentRegisterRequest):
             "message": "MSSV already exists",
         }
 
-    user_id = str(uuid4())
+    user_id = f"U{mssv}"
     await users_collection.insert_one(
         {
             "_id": user_id,
@@ -71,6 +79,7 @@ async def register_student(payload: StudentRegisterRequest):
             "password_hash": hash_password(payload.password),
             "role": "student",
             "group_id": None,
+            "is_active": True,
             "created_at": datetime.now(timezone.utc),
         }
     )
@@ -94,11 +103,22 @@ async def register_student(payload: StudentRegisterRequest):
 async def login_student(payload: StudentLoginRequest):
     mssv = _normalize_text(payload.mssv)
 
+    if not MSSV_REGEX.fullmatch(mssv):
+        return {
+            "status": "error",
+            "data": {},
+            "message": "MSSV must be exactly 8 digits",
+        }
+
     database = get_database()
     users_collection = database[USERS_COLLECTION]
 
     user = await users_collection.find_one({"mssv": mssv, "role": "student"})
-    if not user or not verify_password(payload.password, user.get("password_hash", "")):
+    if (
+        not user
+        or not user.get("is_active", True)
+        or not verify_password(payload.password, user.get("password_hash", ""))
+    ):
         return {
             "status": "error",
             "data": {},
@@ -143,7 +163,11 @@ async def login_admin(payload: AdminLoginRequest):
         }
     )
 
-    if not user or not verify_password(payload.password, user.get("password_hash", "")):
+    if (
+        not user
+        or not user.get("is_active", True)
+        or not verify_password(payload.password, user.get("password_hash", ""))
+    ):
         return {
             "status": "error",
             "data": {},

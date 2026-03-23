@@ -3,68 +3,76 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from app.core.security import hash_password
 from app.db.client import get_database
+from app.db.validators import (
+    GROUPS_SCHEMA_VALIDATOR,
+    MATCHES_SCHEMA_VALIDATOR,
+    USERS_SCHEMA_VALIDATOR,
+)
 
 USERS_COLLECTION = "users"
 GROUPS_COLLECTION = "groups"
 MATCHES_COLLECTION = "matches"
 
-GROUP_ONE_ID = "group-seed-t001"
-GROUP_TWO_ID = "group-seed-t002"
-
-GROUP_ONE_TEAM_ID = "T001padjsl92"
-GROUP_TWO_TEAM_ID = "T002p24jslp2"
 SEED_ROOM_NAME = "Test"
+SEED_USER_MSSV_LIST = ["23012345", "23012346", "23012347"]
+SEED_GROUP_CODE_LIST = ["GRP-A3F9", "GRP-B7K2"]
 
-SEED_USER_MSSV_LIST = ["SV000001", "SV000002", "SV000003"]
-SEED_GROUP_CODE_LIST = ["GRP-T001", "GRP-T002"]
+GROUP_ONE_ID = "T0001padjsl92"
+GROUP_TWO_ID = "T0002p24jslp2"
 
 SEED_USERS = [
     {
-        "_id": "user-seed-001",
-        "mssv": "SV000001",
+        "_id": "U23012345",
+        "mssv": "23012345",
         "full_name": "Nguyen Van A",
-        "password_hash": "seed_password_hash",
+        "class_name": "D21CQCN01-N",
+        "password_hash": hash_password("SeedPass123"),
         "role": "student",
         "group_id": GROUP_ONE_ID,
+        "is_active": True,
     },
     {
-        "_id": "user-seed-002",
-        "mssv": "SV000002",
+        "_id": "U23012346",
+        "mssv": "23012346",
         "full_name": "Tran Thi B",
-        "password_hash": "seed_password_hash",
+        "class_name": "D21CQCN01-N",
+        "password_hash": hash_password("SeedPass123"),
         "role": "student",
         "group_id": GROUP_ONE_ID,
+        "is_active": True,
     },
     {
-        "_id": "user-seed-003",
-        "mssv": "SV000003",
+        "_id": "U23012347",
+        "mssv": "23012347",
         "full_name": "Le Van C",
-        "password_hash": "seed_password_hash",
+        "class_name": "D21CQCN02-N",
+        "password_hash": hash_password("SeedPass123"),
         "role": "student",
         "group_id": GROUP_TWO_ID,
+        "is_active": True,
     },
 ]
 
 SEED_GROUPS = [
     {
         "_id": GROUP_ONE_ID,
-        "group_code": "GRP-T001",
-        "team_id": GROUP_ONE_TEAM_ID,
-        "name": "Team T001",
+        "group_code": "GRP-A3F9",
+        "name": "Team Alpha",
         "description": "Seed team with 2 members",
         "avatar_url": None,
         "is_public": True,
-        "leader_id": "user-seed-001",
+        "leader_id": "U23012345",
         "members": [
             {
-                "user_id": "user-seed-001",
-                "mssv": "SV000001",
+                "user_id": "U23012345",
+                "mssv": "23012345",
                 "full_name": "Nguyen Van A",
             },
             {
-                "user_id": "user-seed-002",
-                "mssv": "SV000002",
+                "user_id": "U23012346",
+                "mssv": "23012346",
                 "full_name": "Tran Thi B",
             },
         ],
@@ -74,17 +82,16 @@ SEED_GROUPS = [
     },
     {
         "_id": GROUP_TWO_ID,
-        "group_code": "GRP-T002",
-        "team_id": GROUP_TWO_TEAM_ID,
-        "name": "Team T002",
+        "group_code": "GRP-B7K2",
+        "name": "Team Beta",
         "description": "Seed team with 1 member",
         "avatar_url": None,
         "is_public": True,
-        "leader_id": "user-seed-003",
+        "leader_id": "U23012347",
         "members": [
             {
-                "user_id": "user-seed-003",
-                "mssv": "SV000003",
+                "user_id": "U23012347",
+                "mssv": "23012347",
                 "full_name": "Le Van C",
             }
         ],
@@ -99,6 +106,7 @@ async def initialize_local_database() -> None:
     database = get_database()
 
     await _ensure_collections(database)
+    await _apply_collection_validators(database)
     await _ensure_indexes(database)
     await _seed_local_data(database)
 
@@ -106,9 +114,33 @@ async def initialize_local_database() -> None:
 async def _ensure_collections(database: Any) -> None:
     existing_collections = set(await database.list_collection_names())
 
-    for name in (USERS_COLLECTION, GROUPS_COLLECTION, MATCHES_COLLECTION):
-        if name not in existing_collections:
-            await database.create_collection(name)
+    if USERS_COLLECTION not in existing_collections:
+        await database.create_collection(USERS_COLLECTION, validator=USERS_SCHEMA_VALIDATOR)
+    if GROUPS_COLLECTION not in existing_collections:
+        await database.create_collection(GROUPS_COLLECTION, validator=GROUPS_SCHEMA_VALIDATOR)
+    if MATCHES_COLLECTION not in existing_collections:
+        await database.create_collection(MATCHES_COLLECTION, validator=MATCHES_SCHEMA_VALIDATOR)
+
+
+async def _apply_collection_validators(database: Any) -> None:
+    await database.command(
+        "collMod",
+        USERS_COLLECTION,
+        validator=USERS_SCHEMA_VALIDATOR,
+        validationLevel="moderate",
+    )
+    await database.command(
+        "collMod",
+        GROUPS_COLLECTION,
+        validator=GROUPS_SCHEMA_VALIDATOR,
+        validationLevel="moderate",
+    )
+    await database.command(
+        "collMod",
+        MATCHES_COLLECTION,
+        validator=MATCHES_SCHEMA_VALIDATOR,
+        validationLevel="moderate",
+    )
 
 
 async def _ensure_indexes(database: Any) -> None:
@@ -124,45 +156,51 @@ async def _ensure_indexes(database: Any) -> None:
         unique=True,
     )
 
-    await database[GROUPS_COLLECTION].create_index(
-        [("team_id", 1)],
-        name="uq_groups_team_id",
-        unique=True,
-    )
-
     await database[MATCHES_COLLECTION].create_index(
         [("room_name", 1)],
         name="uq_matches_room_name",
         unique=True,
     )
 
+    await database[MATCHES_COLLECTION].create_index(
+        [("teams.X.team_id", 1)],
+        name="uq_active_team_x",
+        unique=True,
+        partialFilterExpression={"status": {"$in": ["waiting", "playing"]}},
+    )
+
+    await database[MATCHES_COLLECTION].create_index(
+        [("teams.O.team_id", 1)],
+        name="uq_active_team_o",
+        unique=True,
+        partialFilterExpression={"status": {"$in": ["waiting", "playing"]}},
+    )
+
 
 async def _seed_local_data(database: Any) -> None:
     now = datetime.now(timezone.utc)
 
-    # Upsert keeps startup idempotent even if the service is restarted many times.
+    # Keep timestamps explicit UTC for reproducibility.
     for user in SEED_USERS:
         await database[USERS_COLLECTION].update_one(
             {"mssv": user["mssv"]},
-            {
-                "$setOnInsert": {
-                    **user,
-                    "created_at": now,
-                }
-            },
+            {"$setOnInsert": {**user, "created_at": now}},
             upsert=True,
         )
 
     for group in SEED_GROUPS:
+        group_doc = {
+            **group,
+            "members": [
+                {**member, "joined_at": now} for member in group["members"]
+            ],
+            "created_at": now,
+        }
         await database[GROUPS_COLLECTION].update_one(
             {"group_code": group["group_code"]},
-            {
-                "$setOnInsert": {
-                    **group,
-                    "created_at": now,
-                }
-            },
+            {"$setOnInsert": group_doc},
             upsert=True,
         )
 
-    # User requested local seed without matches.
+    # Explicitly keep local seed with zero matches.
+    await database[MATCHES_COLLECTION].delete_many({"room_name": SEED_ROOM_NAME})

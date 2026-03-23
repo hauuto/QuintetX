@@ -24,7 +24,7 @@ You are an expert Full-Stack Web Developer and System Architect. Your task is to
 - Match Flow: Server initializes → Agent A pulls state & pushes move → Server validates → Agent B → repeat
 - Security: Agents authenticate via Group Tokens. Agents CANNOT modify game state directly.
 - Each team has exactly 1 agent (API endpoint)
-- Only Admin can create rooms. Students cannot.
+- Only teacher and admin can create rooms. Students cannot.
 
 ---
 
@@ -34,12 +34,12 @@ All DB calls must use `motor.motor_asyncio`.
 ## Collection: `users`
 ```json
 {
-    "_id": "uuid_string",
+    "_id": "string",
     "mssv": "string (unique)",
     "full_name": "string",
     "password_hash": "string",
-    "role": "student | admin",
-    "group_id": "uuid_string | null",
+    "role": "student | teacher | admin",
+    "group_id": "string | null (e.g. G0001 for the group they belong to)",
     "created_at": "timestamp"
 }
 ```
@@ -47,13 +47,13 @@ All DB calls must use `motor.motor_asyncio`.
 ## Collection: `groups`
 ```json
 {
-    "_id": "uuid_string",
+    "_id": "string",
     "group_code": "string (unique, auto-generated, e.g. GRP-A3F9)",
     "name": "string",
     "description": "string",
     "avatar_url": "string | null",
     "is_public": true,
-    "leader_id": "uuid_string",
+    "leader_id": "string",
     "members": [
         { "user_id": "uuid_string", "mssv": "string", "full_name": "string", "joined_at": "timestamp" }
     ],
@@ -82,8 +82,8 @@ All DB calls must use `motor.motor_asyncio`.
     "status": "waiting | playing | finished",
     "board": [[0, ...], ...],
     "teams": {
-        "X": { "team_id": "T01", "api_key": "unique_key_x", "is_connected": false },
-        "O": { "team_id": "T02", "api_key": "unique_key_o", "is_connected": false }
+        "X": { "group_id": "T01", "api_key": "unique_key_x", "is_connected": false },
+        "O": { "group_id": "T02", "api_key": "unique_key_o", "is_connected": false }
     },
     "current_turn": "X",
     "winner": null,
@@ -203,13 +203,13 @@ HEARTBEAT_CHECK_INTERVAL: float = 3.0 # Server poll DB mỗi N giây
 ```json
 "teams": {
     "X": {
-        "team_id": "T01",
+        "team_id": "T0001padjsl92",
         "api_key": "unique_key_x",
         "is_connected": false,
         "last_heartbeat": null
     },
     "O": {
-        "team_id": "T02",
+        "team_id": "T0002psdasl31",
         "api_key": "unique_key_o",
         "is_connected": false,
         "last_heartbeat": null
@@ -474,3 +474,22 @@ static/
 - Every UI element must serve a functional purpose — decorative or explanatory text must be omitted
 - Never change CSS structure, color palette, or 40x40 board rendering unless explicitly asked
 - Never modify the 40x40 board rendering logic unless requested
+
+# DATABASE CONSTRAINTS
+- `users.mssv` must be unique across all users. It must be a string of 8 digits. The first two digits represent the enrollment year (e.g., "23" for 2023), followed by 6 unique digits. Example: "23012345".
+- `groups.group_code` must be unique across all groups
+- A user can only belong to one group at a time (`users.group_id` is either null or references one group)
+- `groups.members` array must have a maximum of 6 members (including the leader)
+- `matches.board` must always be a 40x40 2D array, initialized with zeros
+- `matches.teams.X` and `matches.teams.O` must always have valid `team_id` and `api_key` values
+- `matches.current_turn` must always be either "X" or "O"
+- `matches.status` must be one of "waiting", "playing", or "finished"
+- `matches.winner` must be null or one of "X" or "O"
+- All timestamps must be stored in UTC and follow ISO 8601 format
+- `users.id` must be a string start with "U" followed by their MSSV. Example: "U23012345". Id of an admin must be "AXXXX". Where XXXX is a unique 4 digit number. Example: "A0001".
+- `groups.id` must be a string start with "T" followed by a unique 4 digit number then 8 random characters (digits or letters). Example: "T0001padjsl92".
+- `matches.id` must be a string start with "M" followed by a unique 4 digit number then 8 random characters (digits or letters). Example: "M0001as8d7f6".
+- `user.role` must be either "student", "teacher" or "admin". Only users with role "admin" can access admin functionalities. Users with role "teacher" can access a read-only dashboard of all groups and matches but cannot modify any data.
+- When a group is deleted, all its members' `group_id` must be set to null. user can not be deleted at any cost. If a user needs to be "removed", their account must be deactivated by setting a field `is_active` to false (this field must be added to the `users` collection). Deactivated users cannot log in or join groups, but their historical data (matches, group memberships) must be preserved for record-keeping.
+- When a match is created, both teams must be assigned valid `team_id` and `api_key` values that do not conflict with any existing matches. Each team can only participate in one active match at a time.
+- The `board` field in the `matches` collection must always be a 40x40 array of integers, where 0 represents an empty cell, 1 represents a cell occupied by player X, and 2 represents a cell occupied by player O. The server must validate that any move made by an agent updates the board correctly according to these rules.
