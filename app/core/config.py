@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    # Heartbeat Settings
+    HEARTBEAT_INTERVAL: float = 5.0
+    HEARTBEAT_TIMEOUT: float = 15.0
+    HEARTBEAT_CHECK_INTERVAL: float = 3.0
+
     class Config:
         env_file = ".env"
 

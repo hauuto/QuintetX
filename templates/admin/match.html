@@ -34,7 +34,7 @@
                   :style="`width: ${40 * 20}px; height: ${40 * 20}px; background-size: 20px 20px; background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);`">
 
                 <!-- Pieces (Example Rendering) -->
-                <template x-for="move in history" :key="move.id">
+                <template x-for="move in history.slice(0, currentStep)" :key="move.order">
                     <div class="absolute flex items-center justify-center w-5 h-5"
                          :style="`left: ${move.x * 20}px; top: ${move.y * 20}px;`">
                         <span class="font-bold text-[10px]"
@@ -108,14 +108,14 @@
                 <div class="flex items-center justify-between p-2 rounded bg-blue-50 border border-blue-100">
                     <div class="flex items-center">
                         <span class="w-6 h-6 rounded flex items-center justify-center bg-[#3547E5] text-white text-xs font-bold mr-2">X</span>
-                        <span class="font-bold text-gray-900 text-sm">Dragon Slayers</span>
+                        <span class="font-bold text-gray-900 text-sm">{{ match.teams.X.name }}</span>
                     </div>
                 </div>
 
                 <div class="flex items-center justify-between p-2 rounded bg-white hover:bg-gray-50 border border-gray-100">
                     <div class="flex items-center">
                         <span class="w-6 h-6 rounded flex items-center justify-center bg-[#E53535] text-white text-xs font-bold mr-2">O</span>
-                        <span class="font-bold text-gray-900 text-sm">Team Alpha</span>
+                        <span class="font-bold text-gray-900 text-sm">{{ match.teams.O.name }}</span>
                     </div>
                 </div>
             </div>
@@ -136,9 +136,9 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
-                        <template x-for="(move, index) in history" :key="index">
+                        <template x-for="(move, index) in history.slice(0, currentStep)" :key="move.order || index">
                             <tr class="text-xs" :class="{'bg-blue-50/50': index === currentStep - 1}">
-                                <td class="px-3 py-2 text-gray-500 font-mono" x-text="index + 1"></td>
+                                <td class="px-3 py-2 text-gray-500 font-mono" x-text="move.order || index + 1"></td>
                                 <td class="px-3 py-2 font-bold"
                                     :class="move.team === 'X' ? 'text-[#3547E5]' : 'text-[#E53535]'"
                                     x-text="move.team"></td>
@@ -149,6 +149,8 @@
                 </table>
             </div>
         </div>
+
+
 
         <!-- API Body Inspector -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 h-1/3 flex flex-col overflow-hidden shrink-0">
@@ -173,13 +175,19 @@
     function adminMatch() {
         return {
             isPlaying: false,
-            timeDisplay: '01:28',
-            currentStep: 2,
-            totalSteps: 100,
+            timeDisplay: '{{ match.time_elapsed }}',
+            currentStep: {{ match.history|length }},
+            totalSteps: {{ match.history|length }},
             speed: '1',
             history: [
-                { id: 1, team: 'X', x: 20, y: 20 },
-                { id: 2, team: 'O', x: 21, y: 21 }
+                {% for move in match.history %}
+                {
+                    id: {{ move.order or loop.index }},
+                    team: '{{ move.team }}',
+                    x: {{ move.x }},
+                    y: {{ move.y }}
+                },
+                {% endfor %}
             ],
 
             get lastMove() {
@@ -199,6 +207,8 @@
                     timestamp: new Date().toISOString()
                 }, null, 2);
             },
+// ...existing code...
+
 
             togglePlay() {
                 this.isPlaying = !this.isPlaying;
