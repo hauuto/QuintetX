@@ -47,14 +47,28 @@
                 <div class="flex items-center justify-between p-2 rounded bg-blue-50 border border-blue-100">
                     <div class="flex items-center">
                         <span class="w-6 h-6 rounded flex items-center justify-center bg-[#3547E5] text-white text-xs font-bold mr-2">X</span>
-                        <span class="font-bold text-gray-900 text-sm">Dragon Slayers</span>
+                        <div>
+                            <span class="font-bold text-gray-900 text-sm block">Dragon Slayers</span>
+                            <div class="flex items-center gap-1.5 mt-0.5">
+                                <span class="relative flex h-1.5 w-1.5">
+                                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                  <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
+                                </span>
+                                <span class="text-[10px] font-bold text-green-600 uppercase">Đã kết nối</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-
                 <div class="flex items-center justify-between p-2 rounded bg-white hover:bg-gray-50 border border-gray-100">
                     <div class="flex items-center">
                         <span class="w-6 h-6 rounded flex items-center justify-center bg-[#E53535] text-white text-xs font-bold mr-2">O</span>
-                        <span class="font-bold text-gray-900 text-sm">Team Alpha</span>
+                        <div>
+                            <span class="font-bold text-gray-900 text-sm block">Team Alpha</span>
+                            <div class="flex items-center gap-1.5 mt-0.5">
+                                <span class="h-1.5 w-1.5 rounded-full bg-gray-300"></span>
+                                <span class="text-[10px] font-bold text-gray-400 uppercase">Chờ kết nối</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -91,6 +105,21 @@
             </div>
         </div>
 
+        <!-- API Key Access -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 shrink-0 flex items-center justify-between" x-data="{ copied: false, key: 'sk_student_123456789' }">
+            <div class="flex flex-col min-w-0 mr-3">
+                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">API Key</h3>
+                <code class="text-xs font-mono text-gray-900 truncate" x-text="key"></code>
+            </div>
+            <button
+                @click="navigator.clipboard.writeText(key); copied = true; setTimeout(() => copied = false, 2000)"
+                class="bg-[#3547E5] hover:bg-blue-700 text-white text-[10px] font-bold px-3 py-1.5 rounded transition-colors shrink-0 uppercase tracking-wider"
+                :class="copied ? 'bg-green-500 hover:bg-green-600' : ''"
+            >
+                <span x-text="copied ? 'COPIED' : 'COPY'"></span>
+            </button>
+        </div>
+
         <!-- API Body Inspector -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 h-1/3 flex flex-col overflow-hidden shrink-0">
             <div class="p-3 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
@@ -123,4 +152,3 @@
     });
 </script>
 {% endblock %}
-
