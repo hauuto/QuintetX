@@ -1,14 +1,36 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from app.core.config import settings
+from app.db.client import close_db, connect_db
+from app.db.init_db import initialize_local_database
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    try:
+        await connect_db()
+        await initialize_local_database()
+    except Exception as exc:
+        # Fail fast on startup when local MongoDB is unavailable or initialization fails.
+        raise RuntimeError(
+            "MongoDB startup initialization failed. "
+            "Ensure local MongoDB is running and MONGODB_URI is correct."
+        ) from exc
+
+    yield
+
+    await close_db()
 
 app = FastAPI(
     title=settings.APP_NAME,
     description="Competitive Gomoku Platform",
     version=settings.VERSION,
-    debug=settings.DEBUG
+    debug=settings.DEBUG,
+    lifespan=lifespan,
 )
 
 templates = Jinja2Templates(directory="templates")
