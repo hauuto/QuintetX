@@ -1,15 +1,3 @@
-"""Example agent using QuintetX_SDK.py
-
-Run:
-
-  python sdk_example_agent.py --server-url http://127.0.0.1:8000 --team-id T0001padjsl92 --api-key YOUR_API_KEY
-
-This script:
-- connects to QuintetX (/api/v1/agent/init)
-- keeps heartbeat running in background
-- polls state and plays when it's the agent's turn
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -18,8 +6,8 @@ from typing import Tuple
 from QuintetX_SDK import QuintetXClient
 
 
-def first_empty_strategy(state_data: dict) -> Tuple[int, int]:
-    board = state_data["board"]
+def next_move(board: list[list[int]]) -> Tuple[int, int]:
+    """EDIT HERE: return (x, y) for the next move based on current board."""
     for x in range(len(board)):
         for y in range(len(board[x])):
             if board[x][y] == 0:
@@ -43,7 +31,7 @@ def main() -> None:
     )
 
     client.run(
-        first_empty_strategy,
+        next_move,
         poll_interval_seconds=args.poll,
         heartbeat_interval_seconds=args.hb,
         connect_first=True,
@@ -53,3 +41,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# Cách chạy agent này:
+# 1. python filename.py --server-url <SERVER_URL> --team-id <TEAM_ID> --api-key <API_KEY>

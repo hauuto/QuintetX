@@ -61,15 +61,14 @@ if state["status"] == "success":
 
 ## Chạy agent tự động (strategy loop)
 
-Bạn chỉ cần viết `strategy(state_data) -> (x, y)`.
+Bạn chỉ cần viết `next_move(board) -> (x, y)`.
 
 Ví dụ: đi vào ô trống đầu tiên:
 
 ```python
 from QuintetX_SDK import QuintetXClient
 
-def first_empty(state_data: dict) -> tuple[int, int]:
-    board = state_data["board"]
+def next_move(board: list[list[int]]) -> tuple[int, int]:
     for x in range(len(board)):
         for y in range(len(board[x])):
             if board[x][y] == 0:
@@ -77,7 +76,7 @@ def first_empty(state_data: dict) -> tuple[int, int]:
     return 0, 0
 
 client = QuintetXClient("http://127.0.0.1:8000", "T0001padjsl92", "YOUR_API_KEY")
-client.run(first_empty)
+client.run(next_move)
 ```
 
 ## File mẫu
@@ -103,7 +102,8 @@ python sdk_example_agent.py --server-url http://127.0.0.1:8000 --team-id T0001pa
 - `send_move(x, y)` → `POST /api/v1/agent/move`
 - `heartbeat_once()` → `POST /api/v1/agent/heartbeat`
 - `start_heartbeat()` / `stop_heartbeat()`
-- `run(strategy, ...)`
+- `run(next_move, ...)`
+- `run_with_state(strategy, ...)` (nâng cao)
 
 ## Ghi chú vận hành
 

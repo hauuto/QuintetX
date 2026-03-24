@@ -9,6 +9,8 @@ import requests
 
 
 JsonDict = dict
+Board = list[list[int]]
+NextMoveFunc = Callable[[Board], Tuple[int, int]]
 StrategyFunc = Callable[[JsonDict], Tuple[int, int]]
 
 
@@ -141,7 +143,7 @@ class QuintetXClient:
 
     def run(
         self,
-        strategy: StrategyFunc,
+        next_move: NextMoveFunc,
         *,
         poll_interval_seconds: float = 0.5,
         connect_first: bool = True,
@@ -149,9 +151,10 @@ class QuintetXClient:
         heartbeat_interval_seconds: float = 5.0,
         max_steps: int | None = None,
     ) -> None:
-        """Vòng lặp tối giản: poll state; nếu đến lượt thì gọi strategy và gửi move.
+        """Vòng lặp tối giản: poll state; nếu đến lượt thì gọi next_move(board) và gửi move.
 
-        - strategy(state_data) -> (x, y)
+        - next_move(board) -> (x, y)
+        - `board` là trạng thái bàn cờ hiện tại (ma trận 2D)
         - Dừng khi match finished, hoặc khi đạt max_steps (nếu set).
         """
         if connect_first:
@@ -183,6 +186,56 @@ class QuintetXClient:
                 if match_status == "finished":
                     return
 
+                if match_status != "playing":
+                    time.sleep(sleep_s)
+                    continue
+
+                if data.get("turn") == data.get("side"):
+                    board = data.get("board") or []
+                    x, y = next_move(board)
+                    self.send_move(x, y)
+
+                time.sleep(sleep_s)
+        finally:
+            self.stop_heartbeat()
+
+    def run_with_state(
+        self,
+        strategy: StrategyFunc,
+        *,
+        poll_interval_seconds: float = 0.5,
+        connect_first: bool = True,
+        start_heartbeat: bool = True,
+        heartbeat_interval_seconds: float = 5.0,
+        max_steps: int | None = None,
+    ) -> None:
+        """Phiên bản nâng cao: strategy nhận nguyên state_data (bao gồm board/turn/events...)."""
+        if connect_first:
+            init = self.connect(
+                start_heartbeat=start_heartbeat,
+                heartbeat_interval=heartbeat_interval_seconds,
+            )
+            if init.get("status") != "success":
+                raise RuntimeError(init.get("message") or "Cannot connect")
+
+        sleep_s = max(0.05, float(poll_interval_seconds))
+        steps = 0
+        try:
+            while True:
+                if max_steps is not None and steps >= max_steps:
+                    return
+
+                state = self.get_state()
+                steps += 1
+
+                if state.get("status") != "success":
+                    time.sleep(sleep_s)
+                    continue
+
+                data = state.get("data") or {}
+                match_status = data.get("match_status")
+                if match_status == "finished":
+                    return
                 if match_status != "playing":
                     time.sleep(sleep_s)
                     continue
