@@ -135,6 +135,7 @@ MATCHES_SCHEMA_VALIDATOR = {
             "current_turn",
             "winner",
             "history",
+            "start_time",
             "created_at",
         ],
         "properties": {
@@ -197,6 +198,8 @@ MATCHES_SCHEMA_VALIDATOR = {
                     "additionalProperties": False,
                 },
             },
+            "start_time": {"bsonType": "date"},
+            "finished_at": {"bsonType": ["date", "null"]},
             "created_at": {"bsonType": "date"},
         },
         "additionalProperties": False,

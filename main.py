@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from app.api.auth import router as auth_router
 from app.api.groups import router as groups_router
+from app.api.matches import router as matches_router
 from app.core.config import settings
 from app.db.client import close_db, connect_db, get_database
 from app.db.init_db import (
@@ -47,6 +48,7 @@ templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(auth_router)
 app.include_router(groups_router)
+app.include_router(matches_router)
 
 EMPTY_MATCH = {
     "id": "",
@@ -93,11 +95,7 @@ async def student_team(request: Request):
 
 @app.get("/student/match", response_class=HTMLResponse)
 async def student_match(request: Request):
-    return templates.TemplateResponse("student/match.html", {
-        "request": request,
-        "match": EMPTY_MATCH,
-        "team": EMPTY_TEAM,
-    })
+    return templates.TemplateResponse("student/match.html", {"request": request})
 
 @app.get("/student/history", response_class=HTMLResponse)
 async def student_history(request: Request):
@@ -201,6 +199,7 @@ async def db_health_check():
 async def db_seed_test():
     try:
         database = get_database()
+        env_name = (settings.APP_ENV or "dev").strip().lower()
 
         seeded_users = await database[USERS_COLLECTION].count_documents(
             {"mssv": {"$in": SEED_USER_MSSV_LIST}}
@@ -212,25 +211,35 @@ async def db_seed_test():
             {"room_name": SEED_ROOM_NAME}
         )
 
-        checks = {
-            "users_seeded": seeded_users == 3,
-            "groups_seeded": seeded_groups == 2,
-            "matches_seeded": test_room_matches == 0,
-        }
+        admin_count = await database[USERS_COLLECTION].count_documents({"role": "admin", "username": settings.INITIAL_ADMIN_USERNAME})
+
+        if env_name == "prod":
+            checks = {
+                "admin_seeded": admin_count >= 1,
+            }
+        else:
+            checks = {
+                "users_seeded": seeded_users == 3,
+                "groups_seeded": seeded_groups == 2,
+                "matches_seeded": test_room_matches == 0,
+                "admin_seeded": admin_count >= 1,
+            }
         passed = all(checks.values())
 
         return {
             "status": "success" if passed else "error",
             "data": {
                 "expected": {
-                    "users": 3,
-                    "groups": 2,
-                    "matches_room_test": 0,
+                    "users": 3 if env_name != "prod" else "n/a",
+                    "groups": 2 if env_name != "prod" else "n/a",
+                    "matches_room_test": 0 if env_name != "prod" else "n/a",
+                    "admins": ">=1",
                 },
                 "actual": {
                     "users": seeded_users,
                     "groups": seeded_groups,
                     "matches_room_test": test_room_matches,
+                    "admins": admin_count,
                 },
                 "checks": checks,
             },

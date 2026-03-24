@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from app.core.config import settings
 from app.core.security import hash_password
 from app.db.client import get_database
 from app.db.validators import (
@@ -110,7 +111,17 @@ async def initialize_local_database() -> None:
     await _ensure_collections(database)
     await _apply_collection_validators(database)
     await _ensure_indexes(database)
+
+    if not settings.AUTO_SEED_ON_STARTUP:
+        return
+
+    env_name = (settings.APP_ENV or "dev").strip().lower()
+    if env_name == "prod":
+        await _seed_initial_admin(database)
+        return
+
     await _seed_local_data(database)
+    await _seed_initial_admin(database)
 
 
 async def _ensure_collections(database: Any) -> None:
@@ -227,3 +238,26 @@ async def _seed_local_data(database: Any) -> None:
 
     # Explicitly keep local seed with zero matches.
     await database[MATCHES_COLLECTION].delete_many({"room_name": SEED_ROOM_NAME})
+
+
+async def _seed_initial_admin(database: Any) -> None:
+    now = datetime.now(timezone.utc)
+    admin_doc = {
+        "_id": "A0001",
+        "mssv": settings.INITIAL_ADMIN_MSSV,
+        "full_name": settings.INITIAL_ADMIN_FULL_NAME,
+        "class_name": "ADMIN",
+        "username": settings.INITIAL_ADMIN_USERNAME,
+        "email": settings.INITIAL_ADMIN_EMAIL,
+        "password_hash": hash_password(settings.INITIAL_ADMIN_PASSWORD),
+        "role": "admin",
+        "group_id": None,
+        "is_active": True,
+        "created_at": now,
+    }
+
+    await database[USERS_COLLECTION].update_one(
+        {"_id": admin_doc["_id"]},
+        {"$setOnInsert": admin_doc},
+        upsert=True,
+    )
