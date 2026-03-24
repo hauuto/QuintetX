@@ -1,9 +1,11 @@
-{% extends "student/base_student.html" %}
+﻿{% extends "student/base_student.html" %}
 
 {% block student_content %}
-<div class="w-full max-w-5xl mx-auto space-y-8">
-
-    <!-- Header -->
+<div
+    class="w-full max-w-6xl mx-auto space-y-8"
+    x-data="studentTeamPage()"
+    x-init="initPage()"
+>
     <div>
         <h1 class="text-2xl font-bold text-gray-900 relative inline-block">
             Đội của tôi
@@ -11,47 +13,633 @@
         </h1>
     </div>
 
-    <!-- Team Content -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <!-- Team Identity Header -->
-        <div class="p-8 border-b border-gray-100 bg-gray-50/50">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Tên Đội</span>
-                    <h2 class="text-3xl font-extrabold text-[#3547E5] mt-1">{{ team.name }}</h2>
+    <p x-show="errorMessage" x-text="errorMessage" x-cloak x-transition.opacity class="text-sm font-semibold text-red-600"></p>
+    <p x-show="successMessage" x-text="successMessage" x-cloak x-transition.opacity class="text-sm font-semibold text-green-600"></p>
+
+    <div x-show="loading" x-cloak class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-gray-600">
+        Đang tải thông tin đội...
+    </div>
+
+    <template x-if="!loading && !myGroup">
+        <div class="space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
+                <div class="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+                    <form class="flex-1" @submit.prevent="searchOpenGroups()">
+                        <div class="flex items-center bg-gray-100 rounded-lg px-3 py-2">
+                            <svg class="w-5 h-5 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.6-5.65a7.25 7.25 0 11-14.5 0 7.25 7.25 0 0114.5 0z"></path>
+                            </svg>
+                            <input
+                                x-model="searchQuery"
+                                type="text"
+                                class="w-full bg-transparent outline-none text-sm text-gray-800"
+                                placeholder="Tìm nhóm theo tên"
+                            />
+                        </div>
+                    </form>
+
+                    <button
+                        @click="openCreateModal()"
+                        class="h-11 w-11 shrink-0 rounded-lg bg-[#3547E5] text-white flex items-center justify-center hover:bg-blue-700 transition"
+                        aria-label="Tạo nhóm mới"
+                    >
+                        <span class="text-xl leading-none font-bold">+</span>
+                    </button>
                 </div>
-                <div class="flex items-center bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
-                    <div class="mr-4 text-right">
-                        <span class="block text-xs font-bold text-gray-400 uppercase">Team ID</span>
-                        <span class="block text-lg font-mono font-bold text-gray-900">{{ team.id }}</span>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h2 class="text-xl font-bold text-gray-900">Nhóm đang mở và còn chỗ</h2>
+
+                <template x-if="openGroups.length === 0">
+                    <p class="text-gray-600 mt-4">Hiện chưa có nhóm phù hợp.</p>
+                </template>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4" x-show="openGroups.length > 0" x-cloak>
+                    <template x-for="group in openGroups" :key="group.id">
+                        <div class="border border-gray-100 rounded-lg p-4">
+                            <p class="text-xs text-gray-500 font-bold">
+                                Mã đội: <span x-text="group.id"></span>
+                            </p>
+                            <h3 class="text-lg font-bold text-[#3547E5] mt-1" x-text="group.name"></h3>
+                            <p class="text-sm text-gray-600 mt-2" x-text="group.description || 'Chưa có mô tả.'"></p>
+                            <p class="text-xs text-gray-500 mt-3">
+                                Thành viên: <span x-text="group.members_count"></span>/6
+                            </p>
+                            <button
+                                @click="openJoinConfirm(group.id, group.name)"
+                                class="mt-3 w-full border border-[#3547E5] text-[#3547E5] font-bold rounded-lg py-2 hover:bg-blue-50 transition"
+                            >
+                                Gửi yêu cầu tham gia
+                            </button>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="mt-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3" x-show="pagination.total_items > 0" x-cloak>
+                    <p class="text-xs text-gray-500">
+                        Hiển thị tối đa 10 nhóm/trang • Tổng: <span x-text="pagination.total_items"></span> nhóm
+                    </p>
+                    <div class="flex items-center gap-2">
+                        <button
+                            @click="changePage(pagination.page - 1)"
+                            :disabled="!pagination.has_prev"
+                            class="px-3 py-1.5 rounded border border-gray-200 bg-white text-gray-600 text-xs hover:bg-gray-50 disabled:opacity-50"
+                        >
+                            Trước
+                        </button>
+                        <span class="text-xs font-semibold text-gray-600">
+                            Trang <span x-text="pagination.page"></span>/<span x-text="pagination.total_pages"></span>
+                        </span>
+                        <button
+                            @click="changePage(pagination.page + 1)"
+                            :disabled="!pagination.has_next"
+                            class="px-3 py-1.5 rounded border border-gray-200 bg-white text-gray-600 text-xs hover:bg-gray-50 disabled:opacity-50"
+                        >
+                            Sau
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
+    </template>
 
-        <!-- Member List -->
-        <div class="p-8">
-            <h3 class="text-lg font-bold text-gray-900 mb-6 flex items-center">
-                Danh sách thành viên
-                <span class="ml-3 bg-gray-100 text-gray-600 text-xs font-bold px-2.5 py-0.5 rounded-full">{{ team.members|length }}</span>
-            </h3>
+    <template x-if="!loading && myGroup">
+        <div class="space-y-6">
+            <!-- Team Header with Management Controls -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-8 border-b border-gray-100 bg-gray-50/50">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Tên đội</span>
+                            <h2 class="text-3xl font-extrabold text-[#3547E5] mt-1" x-text="myGroup.name"></h2>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <template x-if="isLeader">
+                                <button
+                                    @click="openRenameModal()"
+                                    class="h-10 w-10 rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-[#3547E5] hover:border-blue-200 transition flex items-center justify-center"
+                                    aria-label="Đổi tên đội"
+                                    title="Đổi tên đội"
+                                >
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M16.5 3.5a2.121 2.121 0 113 3L12 14l-4 1 1-4 7.5-7.5z"></path>
+                                    </svg>
+                                </button>
+                            </template>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {% for member in team.members %}
-                <!-- Member Card -->
-                <div class="flex items-center p-4 bg-white border border-gray-100 rounded-lg hover:shadow-md transition-shadow">
-                    <div class="h-12 w-12 rounded-full bg-blue-100 text-[#3547E5] flex items-center justify-center font-bold text-lg">
-                        {{ member.initials }}
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-bold text-gray-900">{{ member.name }}</p>
-                        <p class="text-xs text-gray-500 font-mono mt-0.5">{{ member.mssv }}</p>
+                            <template x-if="isLeader">
+                                <button
+                                    @click="openInviteModal()"
+                                    class="h-10 w-10 rounded-lg bg-[#3547E5] text-white hover:bg-blue-700 transition flex items-center justify-center"
+                                    aria-label="Mời thành viên"
+                                    title="Mời thành viên"
+                                >
+                                    <span class="text-xl leading-none font-bold">+</span>
+                                </button>
+                            </template>
+
+                            <template x-if="isLeader">
+                                <button
+                                    @click="openRequestsModal()"
+                                    class="h-10 px-3 rounded-lg border border-gray-200 bg-white text-gray-700 hover:border-blue-200 hover:text-[#3547E5] transition flex items-center gap-2"
+                                    title="Lời mời"
+                                >
+                                    <span class="text-sm font-semibold">Lời mời</span>
+                                    <template x-if="pendingRequestsCount > 0">
+                                        <span class="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-orange-100 text-orange-700 text-xs font-bold" x-text="pendingRequestsCount"></span>
+                                    </template>
+                                </button>
+                            </template>
+                        </div>
                     </div>
                 </div>
-                {% endfor %}
+
+                <!-- Stats Bar -->
+                <div class="grid grid-cols-3 divide-x divide-gray-100 bg-gray-50/50 px-8 py-4">
+                    <div class="text-center">
+                        <p class="text-xs text-gray-500 font-bold uppercase">Thành viên</p>
+                        <p class="text-2xl font-extrabold text-gray-900 mt-1" x-text="(myGroup.members || []).length"></p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-gray-500 font-bold uppercase">Mã đội</p>
+                        <p class="text-lg font-mono font-bold text-gray-900 mt-1" x-text="myGroup._id"></p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-gray-500 font-bold uppercase">Loại</p>
+                        <p class="text-lg font-bold text-gray-900 mt-1" x-text="myGroup.is_public ? 'Công khai' : 'Riêng tư'"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Members Section -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+                <h3 class="text-lg font-bold text-gray-900 mb-6 flex items-center">
+                    Danh sách thành viên
+                    <span class="ml-3 bg-gray-100 text-gray-600 text-xs font-bold px-2.5 py-0.5 rounded-full" x-text="(myGroup.members || []).length"></span>
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <template x-for="member in (myGroup.members || [])" :key="member.user_id">
+                        <div class="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-lg hover:shadow-md transition-shadow group">
+                            <div class="flex items-center flex-1">
+                                <div class="h-12 w-12 rounded-full bg-blue-100 text-[#3547E5] flex items-center justify-center font-bold text-lg" x-text="initials(member.full_name)"></div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-bold text-gray-900" x-text="member.full_name"></p>
+                                    <p class="text-xs text-gray-500 font-mono mt-0.5" x-text="member.mssv"></p>
+                                </div>
+                            </div>
+                            <!-- Kick Button (Leader Only) -->
+                            <template x-if="isLeader && !isCurrentUser(member.user_id)">
+                                <button
+                                    @click="confirmKickMember(member.user_id, member.full_name)"
+                                    class="text-red-500 hover:text-red-700 font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    Loại ra
+                                </button>
+                            </template>
+                            <!-- Leader Badge -->
+                            <template x-if="isLeaderMember(member.user_id)">
+                                <span class="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded ml-2">Nhóm trưởng</span>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+        </div>
+    </template>
+
+    <!-- Rename Modal -->
+    <div x-show="isRenameModalOpen" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40" @click="closeRenameModal()"></div>
+        <div class="relative z-50 w-full max-w-lg bg-white rounded-xl shadow-xl border border-gray-100 p-6 space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-900">Đổi tên đội</h3>
+                <button @click="closeRenameModal()" class="text-gray-500 hover:text-gray-700 text-xl leading-none">&times;</button>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Tên đội mới</label>
+                <input x-model="renameForm.name" type="text" class="w-full bg-gray-100 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3547E5]" placeholder="Nhập tên đội mới" />
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button @click="closeRenameModal()" class="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Hủy</button>
+                <button @click="renameGroup()" class="px-4 py-2 rounded-lg bg-[#3547E5] text-white font-bold hover:bg-blue-700 transition">Đổi tên</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Kick Modal -->
+    <div x-show="isKickConfirmOpen" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40" @click="closeKickConfirm()"></div>
+        <div class="relative z-50 w-full max-w-lg bg-white rounded-xl shadow-xl border border-gray-100 p-6 space-y-4">
+            <h3 class="text-lg font-bold text-gray-900">Xác nhận loại ra thành viên</h3>
+            <p class="text-sm text-gray-600">
+                Bạn có chắc chắn muốn loại ra <span x-text="kickConfirm.name" class="font-bold"></span> khỏi đội không?
+            </p>
+            <div class="flex justify-end gap-2 pt-2">
+                <button @click="closeKickConfirm()" class="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Hủy</button>
+                <button @click="kickMember()" class="px-4 py-2 rounded-lg bg-red-500 text-white font-bold hover:bg-red-600 transition">Loại ra</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Join Request Modal -->
+    <div x-show="isJoinConfirmOpen" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40" @click="closeJoinConfirm()"></div>
+        <div class="relative z-50 w-full max-w-lg bg-white rounded-xl shadow-xl border border-gray-100 p-6 space-y-4">
+            <h3 class="text-lg font-bold text-gray-900">Xác nhận gửi yêu cầu tham gia</h3>
+            <p class="text-sm text-gray-600">
+                Bạn có chắc chắn muốn gửi yêu cầu tham gia nhóm
+                <span class="font-bold text-gray-900" x-text="joinConfirm.name"></span>
+                không?
+            </p>
+            <div class="flex justify-end gap-2 pt-2">
+                <button @click="closeJoinConfirm()" class="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Hủy</button>
+                <button @click="confirmJoinRequest()" class="px-4 py-2 rounded-lg bg-[#3547E5] text-white font-bold hover:bg-blue-700 transition">Xác nhận</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Modal -->
+    <div x-show="isCreateModalOpen" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40" @click="closeCreateModal()"></div>
+        <div class="relative z-50 w-full max-w-lg bg-white rounded-xl shadow-xl border border-gray-100 p-6 space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-900">Tạo nhóm mới</h3>
+                <button @click="closeCreateModal()" class="text-gray-500 hover:text-gray-700 text-xl leading-none">&times;</button>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Tên nhóm</label>
+                <input x-model="createForm.name" type="text" class="w-full bg-gray-100 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3547E5]" placeholder="Nhập tên nhóm" />
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Mô tả</label>
+                <textarea x-model="createForm.description" rows="3" class="w-full bg-gray-100 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3547E5]" placeholder="Mô tả ngắn gọn về nhóm"></textarea>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Kiểu nhóm</label>
+                <select x-model="createForm.is_public" class="w-full bg-gray-100 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#3547E5]">
+                    <option :value="true">Công khai</option>
+                    <option :value="false">Riêng tư</option>
+                </select>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+                <button @click="closeCreateModal()" class="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Hủy</button>
+                <button @click="createGroup()" class="px-4 py-2 rounded-lg bg-[#3547E5] text-white font-bold hover:bg-blue-700 transition">Tạo nhóm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invite Member Modal -->
+    <div x-show="isInviteModalOpen" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40" @click="closeInviteModal()"></div>
+        <div class="relative z-50 w-full max-w-lg bg-white rounded-xl shadow-xl border border-gray-100 p-6 space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-900">Mời thành viên</h3>
+                <button @click="closeInviteModal()" class="text-gray-500 hover:text-gray-700 text-xl leading-none">&times;</button>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">MSSV</label>
+                <input
+                    x-model="inviteMssv"
+                    type="text"
+                    maxlength="8"
+                    class="w-full bg-gray-100 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#3547E5]"
+                    placeholder="Nhập MSSV (8 chữ số)"
+                />
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+                <button @click="closeInviteModal()" class="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Hủy</button>
+                <button @click="inviteMember()" class="px-4 py-2 rounded-lg bg-[#3547E5] text-white font-bold hover:bg-blue-700 transition">Gửi lời mời</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Requests Modal -->
+    <div x-show="isRequestsModalOpen" x-cloak class="fixed inset-0 z-40 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40" @click="closeRequestsModal()"></div>
+        <div class="relative z-50 w-full max-w-2xl bg-white rounded-xl shadow-xl border border-gray-100 p-6 space-y-4 max-h-[85vh] overflow-hidden flex flex-col">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-900">Yêu cầu tham gia chờ duyệt</h3>
+                <button @click="closeRequestsModal()" class="text-gray-500 hover:text-gray-700 text-xl leading-none">&times;</button>
+            </div>
+
+            <template x-if="pendingRequestsCount === 0">
+                <p class="text-sm text-gray-500">Chưa có yêu cầu tham gia nào cần duyệt.</p>
+            </template>
+
+            <div class="space-y-3 overflow-y-auto" x-show="pendingRequestsCount > 0" x-cloak>
+                <template x-for="req in (myGroup.pending_requests || [])" :key="req.user_id">
+                    <div class="flex items-center justify-between p-4 bg-orange-50 border border-orange-100 rounded-lg">
+                        <div class="flex items-center flex-1">
+                            <div class="h-10 w-10 rounded-full bg-orange-200 text-orange-700 flex items-center justify-center font-bold" x-text="initials(req.full_name)"></div>
+                            <div class="ml-4">
+                                <p class="text-sm font-bold text-gray-900" x-text="req.full_name"></p>
+                                <p class="text-xs text-gray-500 font-mono mt-0.5" x-text="req.mssv"></p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button
+                                @click="approveJoinRequest(req.user_id)"
+                                class="px-3 py-1.5 bg-green-500 text-white font-bold text-xs rounded hover:bg-green-600 transition"
+                            >
+                                Chấp nhận
+                            </button>
+                            <button
+                                @click="rejectJoinRequest(req.user_id)"
+                                class="px-3 py-1.5 bg-gray-300 text-gray-700 font-bold text-xs rounded hover:bg-gray-400 transition"
+                            >
+                                Từ chối
+                            </button>
+                        </div>
+                    </div>
+                </template>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
 
+<script>
+    function studentTeamPage() {
+        return {
+            loading: true,
+            myGroup: null,
+            currentUserId: null,
+            openGroups: [],
+            createForm: { name: '', description: '', is_public: true },
+            renameForm: { name: '' },
+            kickConfirm: { user_id: null, name: '' },
+            joinConfirm: { group_id: null, name: '' },
+            inviteMssv: '',
+            searchQuery: '',
+            isCreateModalOpen: false,
+            isRenameModalOpen: false,
+            isKickConfirmOpen: false,
+            isJoinConfirmOpen: false,
+            isInviteModalOpen: false,
+            isRequestsModalOpen: false,
+            errorMessage: '',
+            successMessage: '',
+            pagination: { page: 1, page_size: 10, total_items: 0, total_pages: 1, has_prev: false, has_next: false },
+            
+            get isLeader() {
+                return this.myGroup && this.myGroup.leader_id === this.currentUserId;
+            },
+
+            get pendingRequestsCount() {
+                return (this.myGroup && this.myGroup.pending_requests) ? this.myGroup.pending_requests.length : 0;
+            },
+
+            isLeaderMember(userId) {
+                return this.myGroup && this.myGroup.leader_id === userId;
+            },
+
+            isCurrentUser(userId) {
+                return userId === this.currentUserId;
+            },
+
+            initials(fullName) {
+                if (!fullName) return '?';
+                return fullName.split(' ').filter(Boolean).slice(0, 2).map(v => v[0].toUpperCase()).join('');
+            },
+
+            openCreateModal() {
+                this.createForm = { name: '', description: '', is_public: true };
+                this.isCreateModalOpen = true;
+            },
+
+            closeCreateModal() {
+                this.isCreateModalOpen = false;
+            },
+
+            openRenameModal() {
+                this.renameForm.name = this.myGroup.name;
+                this.isRenameModalOpen = true;
+            },
+
+            closeRenameModal() {
+                this.isRenameModalOpen = false;
+            },
+
+            confirmKickMember(userId, name) {
+                this.kickConfirm.user_id = userId;
+                this.kickConfirm.name = name;
+                this.isKickConfirmOpen = true;
+            },
+
+            closeKickConfirm() {
+                this.isKickConfirmOpen = false;
+            },
+
+            openInviteModal() {
+                this.isInviteModalOpen = true;
+            },
+
+            closeInviteModal() {
+                this.isInviteModalOpen = false;
+            },
+
+            openRequestsModal() {
+                this.isRequestsModalOpen = true;
+            },
+
+            closeRequestsModal() {
+                this.isRequestsModalOpen = false;
+            },
+
+            openJoinConfirm(groupId, groupName) {
+                this.joinConfirm.group_id = groupId;
+                this.joinConfirm.name = groupName;
+                this.isJoinConfirmOpen = true;
+            },
+
+            closeJoinConfirm() {
+                this.isJoinConfirmOpen = false;
+                this.joinConfirm = { group_id: null, name: '' };
+            },
+
+            async initPage() {
+                this.loading = true;
+                this.errorMessage = '';
+                try {
+                    const user = JSON.parse(localStorage.getItem('qx_user') || '{}');
+                    this.currentUserId = user.id || user._id || null;
+                    await this.fetchMyGroup();
+                    if (!this.myGroup) {
+                        await this.fetchOpenGroups(1);
+                    }
+                } catch (error) {
+                    this.notifyError(error.message || 'Không thể tải dữ liệu.');
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            notifySuccess(message) {
+                this.successMessage = message;
+                this.errorMessage = '';
+                if (window.QXToast && window.QXToast.show) {
+                    window.QXToast.show(message, 'success');
+                }
+                setTimeout(() => { this.successMessage = ''; }, 2400);
+            },
+
+            notifyError(message) {
+                this.errorMessage = message;
+                this.successMessage = '';
+                if (window.QXToast && window.QXToast.show) {
+                    window.QXToast.show(message, 'error');
+                }
+                setTimeout(() => { this.errorMessage = ''; }, 2600);
+            },
+
+            async fetchMyGroup() {
+                const result = await window.QXApi.groups.getMyGroup();
+                this.myGroup = result.data.group;
+            },
+
+            async fetchOpenGroups(page = 1) {
+                const result = await window.QXApi.groups.listOpenGroups({
+                    q: this.searchQuery.trim(),
+                    page,
+                    pageSize: 10,
+                });
+                this.openGroups = result.data.groups || [];
+                this.pagination = result.data.pagination || this.pagination;
+            },
+
+            async searchOpenGroups() {
+                await this.fetchOpenGroups(1);
+            },
+
+            async changePage(page) {
+                if (page < 1) return;
+                await this.fetchOpenGroups(page);
+            },
+
+            async requestJoin(groupId) {
+                this.errorMessage = '';
+                this.successMessage = '';
+                try {
+                    await window.QXApi.groups.requestJoin(groupId, '');
+                    this.notifySuccess('Đã gửi yêu cầu tham gia nhóm.');
+                } catch (error) {
+                    this.notifyError(error.message || 'Không thể kết nối máy chủ. Vui lòng thử lại.');
+                }
+            },
+
+            async confirmJoinRequest() {
+                if (!this.joinConfirm.group_id) {
+                    this.notifyError('Không xác định được nhóm cần tham gia.');
+                    return;
+                }
+                await this.requestJoin(this.joinConfirm.group_id);
+                this.closeJoinConfirm();
+            },
+
+            async createGroup() {
+                if (!this.createForm.name.trim()) {
+                    this.notifyError('Tên nhóm không được để trống.');
+                    return;
+                }
+                this.errorMessage = '';
+                this.successMessage = '';
+                try {
+                    await window.QXApi.groups.createGroup(this.createForm);
+                    this.notifySuccess('Tạo nhóm thành công!');
+                    this.closeCreateModal();
+                    setTimeout(() => this.initPage(), 500);
+                } catch (error) {
+                    this.notifyError(error.message || 'Không thể kết nối máy chủ. Vui lòng thử lại.');
+                }
+            },
+
+            async renameGroup() {
+                if (!this.renameForm.name.trim()) {
+                    this.notifyError('Tên nhóm không được để trống.');
+                    return;
+                }
+                this.errorMessage = '';
+                this.successMessage = '';
+                try {
+                    await window.QXApi.groups.renameGroup(this.myGroup._id, this.renameForm.name.trim());
+                    this.notifySuccess('Đổi tên nhóm thành công!');
+                    this.closeRenameModal();
+                    setTimeout(() => this.initPage(), 500);
+                } catch (error) {
+                    this.notifyError(error.message || 'Không thể kết nối máy chủ. Vui lòng thử lại.');
+                }
+            },
+
+            async kickMember() {
+                this.errorMessage = '';
+                this.successMessage = '';
+                try {
+                    await window.QXApi.groups.kickMember(this.myGroup._id, this.kickConfirm.user_id);
+                    this.notifySuccess(`Đã loại ra ${this.kickConfirm.name}.`);
+                    this.closeKickConfirm();
+                    setTimeout(() => this.initPage(), 500);
+                } catch (error) {
+                    this.notifyError(error.message || 'Không thể kết nối máy chủ. Vui lòng thử lại.');
+                }
+            },
+
+            async approveJoinRequest(userId) {
+                this.errorMessage = '';
+                this.successMessage = '';
+                try {
+                    await window.QXApi.groups.approveJoinRequest(this.myGroup._id, userId);
+                    this.notifySuccess('Đã chấp nhận yêu cầu tham gia.');
+                    if (this.pendingRequestsCount <= 1) {
+                        this.closeRequestsModal();
+                    }
+                    setTimeout(() => this.initPage(), 500);
+                } catch (error) {
+                    this.notifyError(error.message || 'Không thể kết nối máy chủ. Vui lòng thử lại.');
+                }
+            },
+
+            async rejectJoinRequest(userId) {
+                this.errorMessage = '';
+                this.successMessage = '';
+                try {
+                    await window.QXApi.groups.rejectJoinRequest(this.myGroup._id, userId);
+                    this.notifySuccess('Đã từ chối yêu cầu tham gia.');
+                    if (this.pendingRequestsCount <= 1) {
+                        this.closeRequestsModal();
+                    }
+                    setTimeout(() => this.initPage(), 500);
+                } catch (error) {
+                    this.notifyError(error.message || 'Không thể kết nối máy chủ. Vui lòng thử lại.');
+                }
+            },
+
+            async inviteMember() {
+                const mssv = this.inviteMssv.trim();
+                if (!/^\d{8}$/.test(mssv)) {
+                    this.notifyError('MSSV phải gồm đúng 8 chữ số.');
+                    return;
+                }
+
+                this.errorMessage = '';
+                this.successMessage = '';
+                try {
+                    await window.QXApi.groups.inviteByMssv(this.myGroup._id, mssv);
+                    this.notifySuccess(`Đã gửi lời mời đến MSSV ${mssv}.`);
+                    this.inviteMssv = '';
+                    this.closeInviteModal();
+                } catch (error) {
+                    this.notifyError(error.message || 'Gửi lời mời thất bại.');
+                }
+            },
+        };
+    }
+</script>
+{% endblock %}

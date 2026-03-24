@@ -1,12 +1,15 @@
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from app.api.auth import router as auth_router
+from app.api.agent import router as agent_router
+from app.api.groups import router as groups_router
+from app.api.matches import router as matches_router
 from app.core.config import settings
-from app.core.mock_data import mock_db
 from app.db.client import close_db, connect_db, get_database
 from app.db.init_db import (
     GROUPS_COLLECTION,
@@ -46,6 +49,46 @@ app = FastAPI(
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(auth_router)
+app.include_router(agent_router)
+app.include_router(groups_router)
+app.include_router(matches_router)
+
+EMPTY_MATCH = {
+    "id": "",
+    "room_name": "",
+    "status": "waiting",
+    "time_elapsed": "00:00",
+    "teams": {
+        "X": {"team_id": "", "name": "Đội X", "is_connected": False},
+        "O": {"team_id": "", "name": "Đội O", "is_connected": False},
+    },
+    "history": [],
+}
+
+EMPTY_TEAM = {
+    "id": "",
+    "name": "",
+    "api_key": "",
+}
+
+
+def _format_date(value: datetime | None) -> str:
+    if not value:
+        return ""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _map_match_status(status: str | None) -> str:
+    normalized = (status or "").strip().lower()
+    if normalized == "playing":
+        return "Đang diễn ra"
+    if normalized == "waiting":
+        return "Chờ người chơi"
+    if normalized == "finished":
+        return "Kết thúc"
+    return ""
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -59,38 +102,26 @@ async def login_page(request: Request):
 async def register_page(request: Request):
     return templates.TemplateResponse("register_student.html", {"request": request})
 
+
+@app.get("/401", response_class=HTMLResponse)
+async def unauthorized_page(request: Request):
+    return templates.TemplateResponse("401.html", {"request": request})
+
 @app.get("/student/dashboard", response_class=HTMLResponse)
 async def student_dashboard(request: Request):
-    # Simulate fetching logged-in user's team data
-    team = mock_db["teams"][0]
-    recent_matches = mock_db["matches"][:5]
-    return templates.TemplateResponse("student/dashboard.html", {
-        "request": request,
-        "team": team,
-        "matches": recent_matches,
-        "stats": team["stats"]
-    })
+    return templates.TemplateResponse("student/dashboard.html", {"request": request})
 
 @app.get("/student/team", response_class=HTMLResponse)
 async def student_team(request: Request):
-    team = mock_db["teams"][0]
-    return templates.TemplateResponse("student/team.html", {"request": request, "team": team})
+    return templates.TemplateResponse("student/team.html", {"request": request})
 
 @app.get("/student/match", response_class=HTMLResponse)
 async def student_match(request: Request):
-    match_data = mock_db["matches"][0] # Example match
-    # Or use the "current_match" mock
-    current_match = mock_db["current_match"]
-    return templates.TemplateResponse("student/match.html", {
-        "request": request,
-        "match": current_match,
-        "team": mock_db["teams"][0]
-    })
+    return templates.TemplateResponse("student/match.html", {"request": request})
 
 @app.get("/student/history", response_class=HTMLResponse)
 async def student_history(request: Request):
-    matches = mock_db["matches"]
-    return templates.TemplateResponse("student/history.html", {"request": request, "matches": matches})
+    return templates.TemplateResponse("student/history.html", {"request": request, "matches": []})
 
 @app.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
@@ -98,69 +129,126 @@ async def admin_login_page(request: Request):
 
 @app.get("/admin/dashboard", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
-    # Calculate some stats for admin
-    total_teams = len(mock_db["teams"])
-    total_matches = len(mock_db["matches"]) + 20 # Fake more matches
-    return templates.TemplateResponse("admin/dashboard.html", {
-        "request": request,
-        "stats": {
-            "teams": total_teams,
-            "matches": total_matches,
-            "rooms": 3,
-            "pending": 2
-        }
-    })
+    database = get_database()
+    teams_count = await database[GROUPS_COLLECTION].count_documents({})
+    matches_count = await database[MATCHES_COLLECTION].count_documents({})
+    active_rooms = await database[MATCHES_COLLECTION].count_documents({"status": {"$in": ["waiting", "playing"]}})
+
+    return templates.TemplateResponse(
+        "admin/dashboard.html",
+        {
+            "request": request,
+            "stats": {
+                "teams": teams_count,
+                "matches": matches_count,
+                "rooms": active_rooms,
+                "pending": 0,
+            },
+            "recent_activity": [],
+        },
+    )
 
 # Placeholder routes for sidebar links
 @app.get("/admin/teams", response_class=HTMLResponse)
 async def admin_teams(request: Request):
-    # Dummy data for teams
-    teams = [
-        {"id": "T001", "name": "Dragon Slayer", "members_count": 5, "status": "Active", "created_at": "2023-10-01"},
-        {"id": "T002", "name": "Code Warriors", "members_count": 4, "status": "Active", "created_at": "2023-10-02"},
-        {"id": "T003", "name": "AI Masters", "members_count": 3, "status": "Inactive", "created_at": "2023-10-03"},
-        {"id": "T004", "name": "Gomoku Pros", "members_count": 5, "status": "Active", "created_at": "2023-10-05"},
-        {"id": "T005", "name": "Strategy Kings", "members_count": 2, "status": "Pending", "created_at": "2023-10-06"},
-    ]
+    database = get_database()
+    groups = await database[GROUPS_COLLECTION].find(
+        {},
+        {
+            "_id": 1,
+            "name": 1,
+            "members": 1,
+            "created_at": 1,
+        },
+    ).sort("created_at", -1).to_list(length=500)
+
+    teams = []
+    for group in groups:
+        members = group.get("members") or []
+        teams.append(
+            {
+                "id": group.get("_id", ""),
+                "name": group.get("name", ""),
+                "members_count": len(members),
+                "status": "Active",
+                "created_at": _format_date(group.get("created_at")),
+            }
+        )
+
     return templates.TemplateResponse("admin/teams.html", {"request": request, "teams": teams})
 
 
 @app.get("/admin/rooms", response_class=HTMLResponse)
 async def admin_rooms(request: Request):
-    # Mock data for rooms
-    rooms = [
-        {"id": "1001", "name": "Room A-01", "team1": "Dragon Slayer", "team2": "Code Warriors", "status": "Đang diễn ra"},
-        {"id": "1002", "name": "Room B-02", "team1": "AI Masters", "team2": "Gomoku Pros", "status": "Kết thúc"},
-        {"id": "1003", "name": "Room C-03", "team1": "Strategy Kings", "team2": None, "status": "Chờ người chơi"},
-        {"id": "1004", "name": "Trận Chung Kết", "team1": None, "team2": None, "status": "Chờ người chơi"},
-    ]
+    database = get_database()
+    matches = await database[MATCHES_COLLECTION].find(
+        {},
+        {
+            "_id": 1,
+            "room_name": 1,
+            "status": 1,
+            "teams": 1,
+            "created_at": 1,
+        },
+    ).sort("created_at", -1).to_list(length=300)
+
+    team_ids: set[str] = set()
+    for match in matches:
+        teams = match.get("teams") or {}
+        team_ids.add((teams.get("X") or {}).get("team_id", ""))
+        team_ids.add((teams.get("O") or {}).get("team_id", ""))
+    team_ids.discard("")
+
+    group_name_map: dict[str, str] = {}
+    if team_ids:
+        async for group in database[GROUPS_COLLECTION].find(
+            {"_id": {"$in": list(team_ids)}},
+            {"_id": 1, "name": 1},
+        ):
+            group_name_map[group.get("_id")] = group.get("name", "")
+
+    rooms = []
+    for match in matches:
+        teams = match.get("teams") or {}
+        team_x_id = (teams.get("X") or {}).get("team_id")
+        team_o_id = (teams.get("O") or {}).get("team_id")
+
+        rooms.append(
+            {
+                "id": match.get("_id", ""),
+                "name": match.get("room_name", ""),
+                "team1": group_name_map.get(team_x_id, team_x_id) if team_x_id else None,
+                "team2": group_name_map.get(team_o_id, team_o_id) if team_o_id else None,
+                "status": _map_match_status(match.get("status")),
+            }
+        )
+
     return templates.TemplateResponse("admin/rooms.html", {"request": request, "rooms": rooms})
 
 @app.get("/admin/match", response_class=HTMLResponse)
 async def admin_match(request: Request):
-    current_match = mock_db["current_match"]
-    return templates.TemplateResponse("admin/match.html", {"request": request, "match": current_match})
+    return templates.TemplateResponse("admin/match.html", {"request": request})
 
 @app.get("/admin/approvals", response_class=HTMLResponse)
 async def admin_approvals(request: Request):
-    # Mock data for pending admins
-    pending_admins = [
-        {"id": "a001", "username": "tutor_minh", "email": "minh.nguyen@example.com", "created_at": "2023-10-10 08:30", "status": "pending"},
-        {"id": "a002", "username": "ta_hoa", "email": "hoa.tran@example.com", "created_at": "2023-10-11 14:15", "status": "pending"},
-         {"id": "a003", "username": "lab_assist_b", "email": "assist.b@example.com", "created_at": "2023-10-12 09:00", "status": "pending"},
-    ]
-    return templates.TemplateResponse("admin/approvals.html", {"request": request, "pending_admins": pending_admins})
+    return templates.TemplateResponse("admin/approvals.html", {"request": request, "pending_admins": []})
 
 # API endpoints for admin approvals (Mock)
 @app.post("/api/v1/admin/approve/{admin_id}")
 async def approve_admin(admin_id: str):
-    # TODO: Implement DB update logic here
-    return {"status": "success", "message": f"Admin {admin_id} approved"}
+    return {
+        "status": "error",
+        "data": {},
+        "message": "Not implemented",
+    }
 
 @app.delete("/api/v1/admin/reject/{admin_id}")
 async def reject_admin(admin_id: str):
-    # TODO: Implement DB delete logic here
-    return {"status": "success", "message": f"Admin request {admin_id} rejected"}
+    return {
+        "status": "error",
+        "data": {},
+        "message": "Not implemented",
+    }
 
 
 @app.get("/api/v1/system/db/health")
@@ -194,6 +282,7 @@ async def db_health_check():
 async def db_seed_test():
     try:
         database = get_database()
+        env_name = (settings.APP_ENV or "dev").strip().lower()
 
         seeded_users = await database[USERS_COLLECTION].count_documents(
             {"mssv": {"$in": SEED_USER_MSSV_LIST}}
@@ -205,25 +294,35 @@ async def db_seed_test():
             {"room_name": SEED_ROOM_NAME}
         )
 
-        checks = {
-            "users_seeded": seeded_users == 3,
-            "groups_seeded": seeded_groups == 2,
-            "matches_seeded": test_room_matches == 0,
-        }
+        admin_count = await database[USERS_COLLECTION].count_documents({"role": "admin", "username": settings.INITIAL_ADMIN_USERNAME})
+
+        if env_name == "prod":
+            checks = {
+                "admin_seeded": admin_count >= 1,
+            }
+        else:
+            checks = {
+                "users_seeded": seeded_users == 3,
+                "groups_seeded": seeded_groups == 2,
+                "matches_seeded": test_room_matches == 0,
+                "admin_seeded": admin_count >= 1,
+            }
         passed = all(checks.values())
 
         return {
             "status": "success" if passed else "error",
             "data": {
                 "expected": {
-                    "users": 3,
-                    "groups": 2,
-                    "matches_room_test": 0,
+                    "users": 3 if env_name != "prod" else "n/a",
+                    "groups": 2 if env_name != "prod" else "n/a",
+                    "matches_room_test": 0 if env_name != "prod" else "n/a",
+                    "admins": ">=1",
                 },
                 "actual": {
                     "users": seeded_users,
                     "groups": seeded_groups,
                     "matches_room_test": test_room_matches,
+                    "admins": admin_count,
                 },
                 "checks": checks,
             },

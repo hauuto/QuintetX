@@ -12,19 +12,53 @@
     </div>
 
     <!-- Login Card -->
-    <div class="bg-white p-8 md:p-12 rounded-2xl shadow-xl w-full max-w-md border border-gray-100" x-data="{ username: '', password: '', isLoading: false }">
+    <div class="bg-white p-8 md:p-12 rounded-2xl shadow-xl w-full max-w-md border border-gray-100" x-data="{
+            username: '',
+            password: '',
+            isLoading: false,
+            errorMessage: '',
+            async loginAdmin() {
+                this.errorMessage = '';
+                this.isLoading = true;
+                try {
+                    const response = await fetch('/api/v1/auth/login/admin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            username_or_email: this.username.trim(),
+                            password: this.password,
+                        }),
+                    });
+                    const result = await response.json();
+                    if (!response.ok || result.status !== 'success') {
+                        this.errorMessage = result.message || 'Đăng nhập thất bại! Vui lòng kiểm lại';
+                        return;
+                    }
+
+                    localStorage.setItem('qx_access_token', result.data.access_token || '');
+                    localStorage.setItem('qx_user', JSON.stringify(result.data.user || {}));
+                    localStorage.setItem('qx_role', 'admin');
+                    window.location.href = '/admin/dashboard';
+                } catch (error) {
+                    this.errorMessage = 'Không thể kết nối server. Vui lòng thử lại sau.';
+                } finally {
+                    this.isLoading = false;
+                }
+            }
+        }">
 
         <!-- Header Section -->
         <div class="mb-8 text-left">
             <h2 class="text-3xl font-bold text-gray-900 relative inline-block">
                 Đăng nhập Admin
                 <!-- Short blue underline accent -->
-                <span class="absolute bottom-0 left-0 w-1/3 h-1.5 bg-[#3547E5] rounded-full transform translate-y-1"></span>
+                <span
+                    class="absolute bottom-0 left-0 w-1/3 h-1.5 bg-[#3547E5] rounded-full transform translate-y-1"></span>
             </h2>
         </div>
 
         <!-- Form -->
-        <form @submit.prevent="isLoading = true; console.log('Admin login attempt:', username); setTimeout(() => { isLoading = false; window.location.href = '/admin/dashboard'; }, 1000);">
+        <form @submit.prevent="loginAdmin()">
 
             <!-- Username/Email Input -->
             <div class="mb-6">
@@ -32,13 +66,9 @@
                     Tên đăng nhập / Email
                 </label>
                 <!-- Input: light gray background, no border -->
-                <input
-                    x-model="username"
+                <input x-model="username"
                     class="w-full bg-gray-100 text-gray-900 font-semibold rounded-lg py-4 px-4 leading-tight focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#3547E5] transition-all duration-200"
-                    id="username"
-                    type="text"
-                    required
-                >
+                    id="username" type="text" required>
             </div>
 
             <!-- Password Input -->
@@ -48,28 +78,25 @@
                         Mật khẩu
                     </label>
                 </div>
-                <input
-                    x-model="password"
+                <input x-model="password"
                     class="w-full bg-gray-100 text-gray-900 font-semibold rounded-lg py-4 px-4 leading-tight focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#3547E5] transition-all duration-200"
-                    id="password"
-                    type="password"
-                    required
-                >
+                    id="password" type="password" required>
             </div>
 
             <!-- Submit Button -->
             <!-- Primary button: blue fill, white uppercase bold -->
-            <button
-                type="submit"
+            <button type="submit"
                 class="w-full bg-[#3547E5] hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg uppercase tracking-widest shadow-lg hover:shadow-xl transform active:scale-95 transition duration-150 ease-in-out flex justify-center items-center"
-                :disabled="isLoading"
-                :class="{ 'opacity-75 cursor-not-allowed': isLoading }"
-            >
+                :disabled="isLoading" :class="{ 'opacity-75 cursor-not-allowed': isLoading }">
                 <span x-show="!isLoading">Đăng nhập</span>
                 <span x-show="isLoading" class="flex items-center">
-                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg"
+                        fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                        </circle>
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
                     </svg>
                     Đang xử lý...
                 </span>
@@ -77,14 +104,17 @@
 
             <!-- Back to Student Login -->
             <div class="mt-6 text-center text-sm">
-                <a href="/login" class="text-gray-500 hover:text-gray-900 font-medium hover:underline flex items-center justify-center gap-1">
+                <a href="/login"
+                    class="text-gray-500 hover:text-gray-900 font-medium hover:underline flex items-center justify-center gap-1">
                     <span>&larr;</span> Quay lại cổng sinh viên
                 </a>
             </div>
+
+            <p x-show="errorMessage" x-text="errorMessage" x-cloak
+                class="mt-4 text-sm font-semibold text-red-600 text-center"></p>
 
         </form>
     </div>
 
 </div>
 {% endblock %}
-

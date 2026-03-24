@@ -1,169 +1,261 @@
 {% extends "student/base_student.html" %}
 
 {% block student_content %}
-<div class="flex h-[calc(100vh-8rem)] flex-col lg:flex-row gap-6">
-
-    <!-- Left: Game Board Area -->
-    <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden relative" x-data="gameBoard">
-        <!-- Status Bar -->
-        <div class="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-6 shrink-0 z-10">
-            <div class="flex items-center space-x-2">
-                {% if match.status == 'playing' %}
-                <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
-                <span class="text-sm font-bold text-gray-900" x-text="labels.STATUS_PLAYING"></span>
-                {% else %}
-                <span class="w-2.5 h-2.5 rounded-full bg-gray-500"></span>
-                <span class="text-sm font-bold text-gray-900" x-text="labels.STATUS_FINISHED"></span>
-                {% endif %}
-            </div>
-            <div class="text-sm font-mono font-medium text-gray-500">
-                Thời gian trận đấu: <span class="text-gray-900 font-bold">{{ match.time_elapsed }}</span>
-            </div>
+<div x-data="studentMatchPage()" x-init="init()" class="h-[calc(100vh-8rem)]">
+    <template x-if="loading">
+        <div class="h-full flex items-center justify-center bg-white rounded-xl border border-gray-100 shadow-sm">
+            <p class="text-sm font-semibold text-gray-600">Đang tải dữ liệu trận đấu...</p>
         </div>
+    </template>
 
-        <!-- Board Container -->
-        <div class="flex-1 overflow-auto bg-[#F0F2F5] p-4 flex items-center justify-center cursor-move" id="board-container">
-            <!-- 40x40 Grid Canvas/Container -->
-             <div class="relative bg-white shadow-lg border border-gray-300 mx-auto"
-                  :style="`width: ${40 * 20}px; height: ${40 * 20}px; background-size: 20px 20px; background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);`">
-
-                <!-- Coordinate Labels (Simplified) -->
-                <!-- Ideally drawn by JS, static placeholder for now -->
-
-                <!-- Pieces (Dynamic) -->
-                {% for move in match.history %}
-                <div class="absolute" style="left: {{ move.x * 20 if move.x else (move.coord|replace('(', '')|replace(')', '')|replace(',', '')|string).split()[0]|int * 20 }}px; top: {{ move.y * 20 if move.y else (move.coord|replace('(', '')|replace(')', '')|replace(',', '')|string).split()[1]|int * 20 }}px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;">
-                    <span class="{{ 'text-[#3547E5]' if move.team == 'X' else 'text-[#E53535]' }} font-bold text-xs">{{ move.team }}</span>
+    <template x-if="!loading && currentMatch">
+        <div class="flex h-full flex-col lg:flex-row gap-6">
+            <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden relative">
+                <div class="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-6 shrink-0 z-10">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" :class="currentMatch.status === 'playing' ? 'bg-green-500' : 'bg-gray-500'"></span>
+                        <span class="text-sm font-bold text-gray-900" x-text="currentMatch.status === 'playing' ? labels.STATUS_PLAYING : labels.STATUS_FINISHED"></span>
+                    </div>
+                    <div class="text-sm font-semibold text-gray-900" x-text="currentMatch.room_name"></div>
                 </div>
-                {% endfor %}
+
+                <div class="flex-1 overflow-auto bg-[#F0F2F5] p-4 flex items-center justify-center cursor-move" id="board-container">
+                    <div class="relative bg-white shadow-lg border border-gray-300 mx-auto"
+                        :style="`width: ${boardPixelSize}px; height: ${boardPixelSize}px; background-size: ${cellSize}px ${cellSize}px; background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);`">
+
+                        <template x-for="move in currentMatch.history" :key="move.order">
+                            <div class="absolute flex items-center justify-center"
+                                :style="`left: ${move.x * cellSize}px; top: ${move.y * cellSize}px; width: ${cellSize}px; height: ${cellSize}px;`">
+                                <span class="font-bold text-xs" :class="move.team === 'X' ? 'text-[#3547E5]' : 'text-[#E53535]'" x-text="move.team"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Right: Info Panel -->
-    <div class="w-full lg:w-80 flex flex-col gap-6 shrink-0 h-full overflow-hidden">
+            <div class="w-full lg:w-80 flex flex-col gap-6 shrink-0 h-full overflow-hidden">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 shrink-0">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Các đội</h3>
 
-        <!-- Teams -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 shrink-0">
-            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Các đội</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between p-2 rounded"
+                            :class="myTeam && myTeam.side === 'X' ? 'bg-blue-50 border border-blue-100' : 'bg-white border border-gray-100'">
+                            <div class="flex items-center">
+                                <span class="w-6 h-6 rounded flex items-center justify-center bg-[#3547E5] text-white text-xs font-bold mr-2">X</span>
+                                <div>
+                                    <span class="font-bold text-gray-900 text-sm block" x-text="currentMatch.teams.X.name"></span>
+                                    <div class="flex items-center gap-1.5 mt-0.5">
+                                        <template x-if="currentMatch.teams.X.is_connected">
+                                            <span class="text-[10px] font-bold text-green-600 uppercase">Online</span>
+                                        </template>
+                                        <template x-if="!currentMatch.teams.X.is_connected">
+                                            <span class="text-[10px] font-bold text-gray-400 uppercase">Offline</span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-            <div class="space-y-3">
-                <!-- Team X -->
-                <div class="flex items-center justify-between p-2 rounded {{ 'bg-blue-50 border border-blue-100' if match.teams.X.team_id == team.id else 'bg-white hover:bg-gray-50 border border-gray-100' }}">
-                    <div class="flex items-center">
-                        <span class="w-6 h-6 rounded flex items-center justify-center bg-[#3547E5] text-white text-xs font-bold mr-2">X</span>
-                        <div>
-                            <span class="font-bold text-gray-900 text-sm block">{{ match.teams.X.name }}</span>
-                            <div class="flex items-center gap-1.5 mt-0.5">
-                                {% if match.teams.X.is_connected %}
-                                <span class="relative flex h-1.5 w-1.5">
-                                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                  <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
-                                </span>
-                                <span class="text-[10px] font-bold text-green-600 uppercase">Đã kết nối</span>
-                                {% else %}
-                                <span class="h-1.5 w-1.5 rounded-full bg-gray-300"></span>
-                                <span class="text-[10px] font-bold text-gray-400 uppercase">Chờ kết nối</span>
-                                {% endif %}
+                        <div class="flex items-center justify-between p-2 rounded"
+                            :class="myTeam && myTeam.side === 'O' ? 'bg-blue-50 border border-blue-100' : 'bg-white border border-gray-100'">
+                            <div class="flex items-center">
+                                <span class="w-6 h-6 rounded flex items-center justify-center bg-[#E53535] text-white text-xs font-bold mr-2">O</span>
+                                <div>
+                                    <span class="font-bold text-gray-900 text-sm block" x-text="currentMatch.teams.O.name"></span>
+                                    <div class="flex items-center gap-1.5 mt-0.5">
+                                        <template x-if="currentMatch.teams.O.is_connected">
+                                            <span class="text-[10px] font-bold text-green-600 uppercase">Online</span>
+                                        </template>
+                                        <template x-if="!currentMatch.teams.O.is_connected">
+                                            <span class="text-[10px] font-bold text-gray-400 uppercase">Offline</span>
+                                        </template>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                 <!-- Team O -->
-                <div class="flex items-center justify-between p-2 rounded {{ 'bg-blue-50 border border-blue-100' if match.teams.O.team_id == team.id else 'bg-white hover:bg-gray-50 border border-gray-100' }}">
-                    <div class="flex items-center">
-                        <span class="w-6 h-6 rounded flex items-center justify-center bg-[#E53535] text-white text-xs font-bold mr-2">O</span>
-                        <div>
-                            <span class="font-bold text-gray-900 text-sm block">{{ match.teams.O.name }}</span>
-                            <div class="flex items-center gap-1.5 mt-0.5">
-                                {% if match.teams.O.is_connected %}
-                                <span class="relative flex h-1.5 w-1.5">
-                                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                  <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
-                                </span>
-                                <span class="text-[10px] font-bold text-green-600 uppercase">Đã kết nối</span>
-                                {% else %}
-                                <span class="h-1.5 w-1.5 rounded-full bg-gray-300"></span>
-                                <span class="text-[10px] font-bold text-gray-400 uppercase">Chờ kết nối</span>
-                                {% endif %}
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 flex-1 flex flex-col overflow-hidden">
+                    <div class="p-4 border-b border-gray-100 bg-gray-50/50">
+                        <h3 class="text-xs font-bold text-gray-900 uppercase">Lịch sử nước đi</h3>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-0">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-2 text-xs font-semibold text-gray-500">#</th>
+                                    <th class="px-3 py-2 text-xs font-semibold text-gray-500">Đội</th>
+                                    <th class="px-3 py-2 text-xs font-semibold text-gray-500 text-right">Tọa độ</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                <template x-for="move in currentMatch.history" :key="move.order">
+                                    <tr class="text-xs">
+                                        <td class="px-3 py-2 text-gray-500 font-mono" x-text="move.order"></td>
+                                        <td class="px-3 py-2 font-bold" :class="move.team === 'X' ? 'text-[#3547E5]' : 'text-[#E53535]'" x-text="move.team"></td>
+                                        <td class="px-3 py-2 text-gray-700 font-mono text-right" x-text="move.coord"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 h-52 flex flex-col overflow-hidden">
+                    <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                        <h3 class="text-xs font-bold text-gray-900 uppercase">Match Event Log</h3>
+                        <span class="text-[10px] font-semibold text-gray-500" x-text="currentMatch.events ? currentMatch.events.length : 0"></span>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-2 space-y-1">
+                        <template x-if="!currentMatch.events || currentMatch.events.length === 0">
+                            <p class="text-xs text-gray-400 px-2 py-1">Chưa có sự kiện.</p>
+                        </template>
+                        <template x-for="(eventItem, idx) in (currentMatch.events || []).slice().reverse()" :key="`${eventItem.created_at}-${idx}`">
+                            <div class="px-2 py-1.5 rounded border border-gray-100 bg-white">
+                                <p class="text-[11px] font-semibold text-gray-700" x-text="eventItem.type"></p>
+                                <p class="text-xs text-gray-900" x-text="eventItem.message"></p>
+                                <p class="text-[10px] text-gray-400" x-text="eventItem.created_at || ''"></p>
                             </div>
-                        </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 shrink-0 flex items-center justify-between" x-data="{ copied: false }">
+                    <div class="flex flex-col min-w-0 mr-3">
+                        <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">API Key</h3>
+                        <code class="text-xs font-mono text-gray-900 truncate" x-text="myTeam && myTeam.api_key ? myTeam.api_key : ''"></code>
+                    </div>
+                    <button
+                        @click="if (myTeam && myTeam.api_key) { navigator.clipboard.writeText(myTeam.api_key); copied = true; setTimeout(() => copied = false, 2000); }"
+                        class="bg-[#3547E5] hover:bg-blue-700 text-white text-[10px] font-bold px-3 py-1.5 rounded transition-colors shrink-0 uppercase tracking-wider"
+                        :class="copied ? 'bg-green-500 hover:bg-green-600' : ''"
+                    >
+                        <span x-text="copied ? 'COPIED' : 'COPY'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template x-if="!loading && !currentMatch">
+        <div class="h-full bg-white rounded-xl border border-gray-100 shadow-sm p-6 overflow-y-auto">
+            <h2 class="text-lg font-bold text-gray-900 mb-4">Không có trận đấu hiện tại của nhóm bạn</h2>
+
+            <div class="space-y-6">
+                <div>
+                    <h3 class="text-sm font-bold text-gray-500 uppercase mb-3">Đang diễn ra</h3>
+                    <template x-if="otherMatches.current_matches.length === 0">
+                        <p class="text-sm text-gray-400">Không có trận nào.</p>
+                    </template>
+                    <div class="space-y-2">
+                        <template x-for="match in otherMatches.current_matches" :key="match.id">
+                            <div class="border border-gray-100 rounded-lg p-3 flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-bold text-gray-900" x-text="match.room_name"></p>
+                                    <p class="text-xs text-gray-500" x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
+                                </div>
+                                <span class="text-xs font-bold text-green-600">Đang diễn ra</span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-bold text-gray-500 uppercase mb-3">Sắp tới</h3>
+                    <template x-if="otherMatches.upcoming_matches.length === 0">
+                        <p class="text-sm text-gray-400">Không có trận nào.</p>
+                    </template>
+                    <div class="space-y-2">
+                        <template x-for="match in otherMatches.upcoming_matches" :key="match.id">
+                            <div class="border border-gray-100 rounded-lg p-3 flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-bold text-gray-900" x-text="match.room_name"></p>
+                                    <p class="text-xs text-gray-500" x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
+                                </div>
+                                <span class="text-xs font-bold text-yellow-600">Sắp tới</span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-sm font-bold text-gray-500 uppercase mb-3">Đã xong</h3>
+                    <template x-if="otherMatches.finished_matches.length === 0">
+                        <p class="text-sm text-gray-400">Không có trận nào.</p>
+                    </template>
+                    <div class="space-y-2">
+                        <template x-for="match in otherMatches.finished_matches" :key="match.id">
+                            <div class="border border-gray-100 rounded-lg p-3 flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-bold text-gray-900" x-text="match.room_name"></p>
+                                    <p class="text-xs text-gray-500" x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
+                                </div>
+                                <span class="text-xs font-bold text-gray-500">Kết thúc</span>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Move History -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 flex-1 flex flex-col overflow-hidden">
-            <div class="p-4 border-b border-gray-100 bg-gray-50/50">
-                <h3 class="text-xs font-bold text-gray-900 uppercase">Lịch sử nước đi</h3>
-            </div>
-            <div class="flex-1 overflow-y-auto p-0">
-                <table class="w-full text-left border-collapse">
-                    <thead class="bg-gray-50 sticky top-0">
-                        <tr>
-                            <th class="px-3 py-2 text-xs font-semibold text-gray-500">#</th>
-                            <th class="px-3 py-2 text-xs font-semibold text-gray-500">Đội</th>
-                            <th class="px-3 py-2 text-xs font-semibold text-gray-500 text-right">Tọa độ</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        {% for move in match.history %}
-                        <tr class="text-xs {{ 'bg-gray-50/50' if loop.index % 2 == 0 else '' }}">
-                            <td class="px-3 py-2 text-gray-500 font-mono">{{ move.order if move.order else loop.index }}</td>
-                            <td class="px-3 py-2 font-bold {{ 'text-[#3547E5]' if move.team == 'X' else 'text-[#E53535]' }}">{{ move.team }}</td>
-                            <td class="px-3 py-2 text-gray-700 font-mono text-right">{{ move.coord }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- API Key Access -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 shrink-0 flex items-center justify-between" x-data="{ copied: false, key: '{{ team.api_key }}' }">
-            <div class="flex flex-col min-w-0 mr-3">
-                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">API Key</h3>
-                <code class="text-xs font-mono text-gray-900 truncate" x-text="key"></code>
-            </div>
-            <button
-                @click="navigator.clipboard.writeText(key); copied = true; setTimeout(() => copied = false, 2000)"
-                class="bg-[#3547E5] hover:bg-blue-700 text-white text-[10px] font-bold px-3 py-1.5 rounded transition-colors shrink-0 uppercase tracking-wider"
-                :class="copied ? 'bg-green-500 hover:bg-green-600' : ''"
-            >
-                <span x-text="copied ? 'COPIED' : 'COPY'"></span>
-            </button>
-        </div>
-
-        <!-- API Body Inspector -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 h-1/3 flex flex-col overflow-hidden shrink-0">
-            <div class="p-3 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                <h3 class="text-xs font-bold text-gray-900 uppercase">API Body</h3>
-                <span class="text-[10px] font-mono bg-gray-200 px-1.5 rounded text-gray-600">JSON</span>
-            </div>
-            <div class="flex-1 bg-[#282c34] p-3 overflow-auto">
-                <pre class="text-xs font-mono text-gray-300 leading-relaxed">
-{
-  "team_id": "TEAM-007",
-  "match_id": "MATCH-123",
-  "move": {
-    "x": 20,
-    "y": 20
-  },
-  "timestamp": 1679203928
-}</pre>
-            </div>
-        </div>
-
-    </div>
+    </template>
 </div>
 
 <script>
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('gameBoard', () => ({
+    function studentMatchPage() {
+        return {
+            loading: true,
+            currentMatch: null,
+            myTeam: null,
+            pollTimerId: null,
+            otherMatches: {
+                current_matches: [],
+                upcoming_matches: [],
+                finished_matches: [],
+            },
             labels: CONFIG.LABELS,
-            // Additional board logic would go here
-        }));
-    });
+            cellSize: 20,
+            boardPixelSize: CONFIG.BOARD_SIZE * 20,
+
+            async init() {
+                await this.loadMyMatch();
+                this.startPolling();
+            },
+
+            startPolling() {
+                if (this.pollTimerId) {
+                    clearInterval(this.pollTimerId);
+                }
+                this.pollTimerId = setInterval(() => {
+                    this.loadMyMatch(false);
+                }, 1200);
+            },
+
+            async loadMyMatch(showLoading = true) {
+                if (showLoading) {
+                    this.loading = true;
+                }
+                try {
+                    const result = await window.QXApi.matches.getMyMatch();
+                    const data = result.data || {};
+                    this.currentMatch = data.my_current_match || null;
+                    this.myTeam = data.my_team || null;
+                    this.otherMatches = data.other_matches || {
+                        current_matches: [],
+                        upcoming_matches: [],
+                        finished_matches: [],
+                    };
+                } catch (error) {
+                    if (window.QXToast && window.QXToast.show) {
+                        window.QXToast.show(error.message || 'Không thể tải dữ liệu trận đấu.', 'error');
+                    }
+                } finally {
+                    if (showLoading) {
+                        this.loading = false;
+                    }
+                }
+            },
+        };
+    }
 </script>
 {% endblock %}

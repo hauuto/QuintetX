@@ -1,9 +1,11 @@
-{% extends "student/base_student.html" %}
+﻿{% extends "student/base_student.html" %}
 
 {% block student_content %}
-<div class="w-full max-w-7xl mx-auto space-y-8">
-
-    <!-- Header -->
+<div
+    class="w-full max-w-7xl mx-auto space-y-8"
+    x-data="studentDashboard()"
+    x-init="initPage()"
+>
     <div>
         <h1 class="text-2xl font-bold text-gray-900 relative inline-block">
             Tổng quan
@@ -11,123 +13,178 @@
         </h1>
     </div>
 
-    <!-- Stats Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Matches Card -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-            <div>
-                <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Tổng trận đấu</p>
-                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.matches }}</p>
-            </div>
-            <div class="p-3 bg-blue-50 rounded-full text-[#3547E5]">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
-            </div>
-        </div>
+    <p x-show="errorMessage" x-cloak class="text-sm font-semibold text-red-600" x-text="errorMessage"></p>
 
-        <!-- Wins Card -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-            <div>
-                <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Thắng</p>
-                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.wins }}</p>
-            </div>
-            <div class="p-3 bg-green-50 rounded-full text-green-600">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </div>
-        </div>
-
-        <!-- Losses Card -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-            <div>
-                <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Thua</p>
-                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.losses }}</p>
-            </div>
-            <div class="p-3 bg-red-50 rounded-full text-red-600">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </div>
-        </div>
+    <div x-show="loading" x-cloak class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-gray-600">
+        Đang tải dữ liệu tổng quan...
     </div>
 
-    <!-- Team Info Card -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 class="text-lg font-bold text-gray-900 mb-4">Thông tin đội</h2>
-        <div class="flex items-start justify-between">
-            <div>
-                <p class="text-sm text-gray-500 mb-1">Tên đội</p>
-                <p class="text-xl font-bold text-[#3547E5]">{{ team.name }}</p>
-            </div>
-            <div class="text-right">
-                <p class="text-sm text-gray-500 mb-1">ID Đội</p>
-                <p class="text-lg font-mono font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded">{{ team.id }}</p>
-            </div>
-        </div>
-        <div class="mt-6">
-            <p class="text-sm text-gray-500 mb-3">Thành viên</p>
-            <div class="flex -space-x-2">
-                {% for member in team.members %}
-                <div class="w-10 h-10 rounded-full bg-gray-300 border-2 border-white flex items-center justify-center text-xs font-bold text-gray-600" title="{{ member.name }}">{{ member.initials }}</div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
+    <template x-if="!loading">
+        <div class="space-y-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Tổng trận đấu</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2" x-text="statsData.matches"></p>
+                    </div>
+                    <div class="p-3 bg-blue-50 rounded-full text-[#3547E5]">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                        </svg>
+                    </div>
+                </div>
 
-    <!-- Recent History Table -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="p-6 border-b border-gray-100">
-            <h2 class="text-lg font-bold text-gray-900">Lịch sử đấu gần đây</h2>
-        </div>
-        <table class="w-full text-left">
-            <thead class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold">
-                <tr>
-                    <th class="px-6 py-4">STT</th>
-                    <th class="px-6 py-4">Đối thủ</th>
-                    <th class="px-6 py-4">Kết quả</th>
-                    <th class="px-6 py-4 text-right">Thời gian</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-                {% for match in matches %}
-                <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="px-6 py-4 text-sm text-gray-600 font-mono">{{ loop.index }}</td>
-                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">
-                        {% if match.teams.X.team_id == team.id %}
-                            {{ match.teams.O.name }}
-                        {% else %}
-                            {{ match.teams.X.name }}
-                        {% endif %}
-                    </td>
-                    <td class="px-6 py-4">
-                        {% if match.winner == "X" and match.teams.X.team_id == team.id %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span>
-                        {% elif match.winner == "O" and match.teams.O.team_id == team.id %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span>
-                        {% else %}
-                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">Thua</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-6 py-4 text-sm text-gray-500 text-right">{{ match.start_time }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">Gamma Rays</td>
-                    <td class="px-6 py-4"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span></td>
-                    <td class="px-6 py-4 text-sm text-gray-500 text-right">08:00 19/03</td>
-                </tr>
-                <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="px-6 py-4 text-sm text-gray-600 font-mono">04</td>
-                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">Delta Force</td>
-                    <td class="px-6 py-4"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span></td>
-                    <td class="px-6 py-4 text-sm text-gray-500 text-right">16:45 18/03</td>
-                </tr>
-                <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="px-6 py-4 text-sm text-gray-600 font-mono">05</td>
-                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">Omega Zero</td>
-                    <td class="px-6 py-4"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">Thua</span></td>
-                    <td class="px-6 py-4 text-sm text-gray-500 text-right">14:20 18/03</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Thắng</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2" x-text="statsData.wins"></p>
+                    </div>
+                    <div class="p-3 bg-green-50 rounded-full text-green-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                </div>
 
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Thua</p>
+                        <p class="text-3xl font-bold text-gray-900 mt-2" x-text="statsData.losses"></p>
+                    </div>
+                    <div class="p-3 bg-red-50 rounded-full text-red-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h2 class="text-lg font-bold text-gray-900 mb-4">Thông tin đội</h2>
+
+                <template x-if="teamData">
+                    <div>
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500 mb-1">Tên đội</p>
+                                <p class="text-xl font-bold text-[#3547E5]" x-text="teamData.name"></p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm text-gray-500 mb-1">Mã đội</p>
+                                <p class="text-lg font-mono font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded" x-text="teamData.id"></p>
+                            </div>
+                        </div>
+                        <div class="mt-6">
+                            <p class="text-sm text-gray-500 mb-3">Thành viên</p>
+                            <div class="flex -space-x-2">
+                                <template x-for="member in (teamData.members || [])" :key="member.user_id">
+                                    <div
+                                        class="w-10 h-10 rounded-full bg-gray-300 border-2 border-white flex items-center justify-center text-xs font-bold text-gray-600"
+                                        :title="member.full_name"
+                                        x-text="toInitials(member.full_name)"
+                                    ></div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="!teamData">
+                    <p class="text-gray-700">Bạn chưa tham gia nhóm nào.</p>
+                </template>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-6 border-b border-gray-100">
+                    <h2 class="text-lg font-bold text-gray-900">Lịch sử đấu gần đây</h2>
+                </div>
+                <table class="w-full text-left">
+                    <thead class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold">
+                        <tr>
+                            <th class="px-6 py-4">STT</th>
+                            <th class="px-6 py-4">Đối thủ</th>
+                            <th class="px-6 py-4">Kết quả</th>
+                            <th class="px-6 py-4 text-right">Thời gian</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        <template x-if="matchesData.length === 0">
+                            <tr>
+                                <td class="px-6 py-6 text-sm text-gray-600" colspan="4">
+                                    Chưa có trận đấu nào.
+                                </td>
+                            </tr>
+                        </template>
+
+                        <template x-for="(match, index) in matchesData" :key="match.id">
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 text-sm text-gray-600 font-mono" x-text="index + 1"></td>
+                                <td class="px-6 py-4 text-sm font-semibold text-gray-900" x-text="match.opponent"></td>
+                                <td class="px-6 py-4">
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold"
+                                        :class="match.result === 'thắng' ? 'bg-green-100 text-green-800' : (match.result === 'thua' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800')"
+                                        x-text="capitalize(match.result)"
+                                    ></span>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-500 text-right" x-text="formatDate(match.played_at)"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </template>
 </div>
-{% endblock %}
 
+<script>
+    function studentDashboard() {
+        return {
+            loading: true,
+            errorMessage: '',
+            teamData: null,
+            statsData: { matches: 0, wins: 0, losses: 0 },
+            matchesData: [],
+
+            async initPage() {
+                this.loading = true;
+                this.errorMessage = '';
+                try {
+                    const result = await window.QXApi.groups.getDashboard();
+
+                    const data = result.data || {};
+                    this.teamData = data.team || null;
+                    this.statsData = data.stats || { matches: 0, wins: 0, losses: 0 };
+                    this.matchesData = data.matches || [];
+                } catch (error) {
+                    this.errorMessage = error.message || 'Không thể kết nối máy chủ.';
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            toInitials(fullName) {
+                if (!fullName) return '?';
+                return fullName
+                    .split(' ')
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((part) => part[0].toUpperCase())
+                    .join('');
+            },
+
+            formatDate(value) {
+                if (!value) return '-';
+                const date = new Date(value);
+                if (Number.isNaN(date.getTime())) return '-';
+                return date.toLocaleString('vi-VN');
+            },
+
+            capitalize(value) {
+                if (!value) return '';
+                return value.charAt(0).toUpperCase() + value.slice(1);
+            },
+        };
+    }
+</script>
+{% endblock %}

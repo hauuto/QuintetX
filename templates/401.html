@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>401 Unauthorized - QuintetX</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="shortcut icon" href="/static/favicon.ico">
+    <script src="/static/js/config.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        if (window.tailwindConfig) {
+            tailwind.config = window.tailwindConfig;
+        }
+    </script>
+</head>
+<body class="min-h-screen bg-[#F0F2F5] flex items-center justify-center p-6">
+    <div class="w-full max-w-lg bg-white border border-gray-100 rounded-2xl shadow-sm p-8 text-center space-y-4">
+        <p class="text-sm font-bold text-red-600">401 Unauthorized</p>
+        <h1 class="text-2xl font-extrabold text-gray-900">Liên kết không hợp lệ hoặc phiên đăng nhập đã hết hạn.</h1>
+        <p class="text-sm text-gray-600">Hệ thống sẽ tự động chuyển bạn về trang đăng nhập trong <span id="countdown">3</span> giây.</p>
+        <div class="pt-2">
+            <a id="login-link" href="/login" class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[#3547E5] text-white font-bold hover:bg-blue-700 transition">
+                Về trang đăng nhập ngay
+            </a>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const params = new URLSearchParams(window.location.search);
+            const next = params.get('next') || '/login';
+            const loginLink = document.getElementById('login-link');
+            const countdownEl = document.getElementById('countdown');
+            if (loginLink) {
+                loginLink.href = next;
+            }
+
+            let remain = 3;
+            const timer = setInterval(function () {
+                remain -= 1;
+                if (countdownEl) {
+                    countdownEl.textContent = String(remain);
+                }
+                if (remain <= 0) {
+                    clearInterval(timer);
+                    window.location.replace(next);
+                }
+            }, 1000);
+        })();
+    </script>
+</body>
+</html>

@@ -1,7 +1,30 @@
 {% extends "admin/base_admin.html" %}
 
 {% block admin_content %}
-<div class="w-full max-w-7xl mx-auto space-y-8">
+<div
+    class="w-full max-w-7xl mx-auto space-y-8"
+    x-data="{
+        currentUser: { full_name: 'Administrator', role: 'admin' },
+        initUser() {
+            try {
+                const raw = localStorage.getItem('qx_user');
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.full_name) {
+                    this.currentUser = {
+                        full_name: parsed.full_name,
+                        role: parsed.role || 'admin',
+                    };
+                }
+            } catch (error) {
+                // Keep fallback labels.
+            }
+        }
+    }"
+    x-init="initUser()"
+>
+    {% set stats_data = stats if stats is defined and stats else {} %}
+    {% set recent = recent_activity if recent_activity is defined and recent_activity else [] %}
 
     <!-- Header -->
     <div>
@@ -9,7 +32,18 @@
             Tổng quan
             <span class="absolute -bottom-1 left-0 w-1/3 h-1 bg-[#3547E5] rounded-full"></span>
         </h1>
+        <p class="mt-2 text-sm text-gray-600">
+            Xin chao <span class="font-bold text-gray-900" x-text="currentUser.full_name"></span>,
+            bang dieu khien da san sang cho lenh moi.
+        </p>
     </div>
+
+    {% if not stats_data %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <p class="text-lg font-bold text-[#3547E5]">Bang dieu khien admin dang khoi dong dong co phan luc.</p>
+        <p class="text-gray-600 mt-2">Chua co thong ke nao, nhung tinh than quan tri van dang max cong suat.</p>
+    </div>
+    {% endif %}
 
     <!-- Stats Grid -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -17,7 +51,7 @@
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
             <div>
                 <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Đội thi đấu</p>
-                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.teams }}</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats_data.teams | default(0, true) }}</p>
             </div>
             <div class="p-3 bg-blue-50 rounded-full text-[#3547E5]">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
@@ -28,7 +62,7 @@
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
             <div>
                 <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Trận đấu</p>
-                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.matches }}</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats_data.matches | default(0, true) }}</p>
             </div>
             <div class="p-3 bg-green-50 rounded-full text-green-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
@@ -39,7 +73,7 @@
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
             <div>
                 <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Phòng đấu</p>
-                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.rooms }}</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats_data.rooms | default(0, true) }}</p>
             </div>
             <div class="p-3 bg-purple-50 rounded-full text-purple-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
@@ -50,7 +84,7 @@
         <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
             <div>
                 <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Yêu cầu duyệt</p>
-                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats.pending }}</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ stats_data.pending | default(0, true) }}</p>
             </div>
             <div class="p-3 bg-yellow-50 rounded-full text-yellow-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
@@ -75,24 +109,22 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 text-sm text-gray-500">2 phút trước</td>
-                        <td class="px-6 py-4 text-sm font-semibold text-gray-900">Tạo phòng đấu</td>
-                        <td class="px-6 py-4 text-sm text-gray-600">Admin</td>
-                        <td class="px-6 py-4 text-sm text-gray-500">Phòng #102 created</td>
+                    {% if recent %}
+                        {% for item in recent %}
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4 text-sm text-gray-500">{{ item.time }}</td>
+                            <td class="px-6 py-4 text-sm font-semibold text-gray-900">{{ item.action }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-600">{{ item.actor }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">{{ item.detail }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td class="px-6 py-6 text-sm text-gray-600" colspan="4">
+                            Chua co log nao, he thong dang ngoi thien va cho admin ra lenh dau tien.
+                        </td>
                     </tr>
-                     <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 text-sm text-gray-500">15 phút trước</td>
-                        <td class="px-6 py-4 text-sm font-semibold text-gray-900">Đăng ký đội</td>
-                        <td class="px-6 py-4 text-sm text-gray-600">System</td>
-                        <td class="px-6 py-4 text-sm text-gray-500">Team "Alpha" registered</td>
-                    </tr>
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 text-sm text-gray-500">1 giờ trước</td>
-                        <td class="px-6 py-4 text-sm font-semibold text-gray-900">Kết thúc trận đấu</td>
-                        <td class="px-6 py-4 text-sm text-gray-600">System</td>
-                        <td class="px-6 py-4 text-sm text-gray-500">Match #45: Dragon vs Tiger (1-0)</td>
-                    </tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>

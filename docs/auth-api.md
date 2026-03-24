@@ -182,3 +182,50 @@ curl -X POST "http://127.0.0.1:8000/api/v1/auth/login/admin" \
 - access_token hien tai la token tam de bat dau backend flow.
 - Buoc tiep theo nen thay bang JWT ky bang SECRET_KEY.
 - Password duoc hash theo PBKDF2 truoc khi luu vao MongoDB.
+
+## Group Management API (JWT Bearer)
+
+Tat ca API ben duoi can header:
+
+```text
+Authorization: Bearer <access_token>
+```
+
+1) GET /api/v1/groups/open-missing
+- Tra danh sach group cong khai va chua du 6 thanh vien.
+
+1.1) GET /api/v1/groups/me
+- Tra ve group hien tai cua user dang dang nhap.
+- Neu chua co group: group = null.
+
+2) POST /api/v1/groups
+- Tao group moi.
+- Body: {"name", "description", "avatar_url", "is_public"}
+
+3) POST /api/v1/groups/{group_id}/join
+- Rule hien tai: group public van gui join request.
+- Group private: khong join truc tiep, chi vao bang invite.
+
+4) GET /api/v1/groups/{group_id}/join-requests
+- Chi leader xem danh sach nguoi xin vao.
+
+5) POST /api/v1/groups/{group_id}/join-requests/{user_id}/approve
+
+6) POST /api/v1/groups/{group_id}/join-requests/{user_id}/reject
+
+7) GET /api/v1/groups/players/search?mssv=23012345
+- Tra ve player = null | thong tin user.
+- Bao gom trang thai has_group va group_id.
+
+8) POST /api/v1/groups/{group_id}/invite
+- Body: {"mssv": "23012345"}
+
+9) POST /api/v1/groups/invites/{notification_id}/accept
+
+10) POST /api/v1/groups/invites/{notification_id}/reject
+
+11) PATCH /api/v1/groups/{group_id}/name
+- Body: {"name": "Ten moi"}
+
+12) DELETE /api/v1/groups/{group_id}/members/{member_user_id}
+- Leader co the kick thanh vien (khong kick chinh leader).

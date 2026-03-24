@@ -6,6 +6,7 @@ REGEX_USER_ID = r"^(U\d{8}|A\d{4})$"
 REGEX_GROUP_ID = r"^T\d{4}[a-zA-Z0-9]{8}$"
 REGEX_MATCH_ID = r"^M\d{4}[a-zA-Z0-9]{8}$"
 REGEX_GROUP_CODE = r"^GRP-[A-Z0-9]{4}$"
+REGEX_NOTIFICATION_ID = r"^N\d{4}[a-zA-Z0-9]{8}$"
 
 USERS_SCHEMA_VALIDATOR = {
     "$jsonSchema": {
@@ -134,6 +135,7 @@ MATCHES_SCHEMA_VALIDATOR = {
             "current_turn",
             "winner",
             "history",
+            "start_time",
             "created_at",
         ],
         "properties": {
@@ -196,6 +198,69 @@ MATCHES_SCHEMA_VALIDATOR = {
                     "additionalProperties": False,
                 },
             },
+            "events": {
+                "bsonType": "array",
+                "items": {
+                    "bsonType": "object",
+                    "required": ["type", "message", "side", "team_id", "payload", "created_at"],
+                    "properties": {
+                        "type": {"bsonType": "string", "minLength": 1},
+                        "message": {"bsonType": "string", "minLength": 1},
+                        "side": {"bsonType": ["string", "null"]},
+                        "team_id": {"bsonType": ["string", "null"]},
+                        "payload": {"bsonType": "object"},
+                        "created_at": {"bsonType": "date"},
+                    },
+                    "additionalProperties": False,
+                },
+            },
+            "start_time": {"bsonType": "date"},
+            "started_at": {"bsonType": ["date", "null"]},
+            "finished_at": {"bsonType": ["date", "null"]},
+            "turn_deadline_at": {"bsonType": ["date", "null"]},
+            "finish_reason": {"bsonType": ["string", "null"]},
+            "created_at": {"bsonType": "date"},
+        },
+        "additionalProperties": False,
+    }
+}
+
+NOTIFICATIONS_SCHEMA_VALIDATOR = {
+    "$jsonSchema": {
+        "bsonType": "object",
+        "required": [
+            "_id",
+            "user_id",
+            "sender_id",
+            "type",
+            "message",
+            "is_read",
+            "created_at",
+            "status",
+            "link",
+        ],
+        "properties": {
+            "_id": {"bsonType": "string", "pattern": REGEX_NOTIFICATION_ID},
+            "user_id": {"bsonType": "string", "pattern": REGEX_USER_ID},
+            "sender_id": {"bsonType": "string"},
+            "type": {
+                "enum": [
+                    "invite",
+                    "join_request",
+                    "join_approved",
+                    "join_rejected",
+                    "invite_accepted",
+                    "invite_rejected",
+                    "kicked",
+                    "info",
+                ]
+            },
+            "message": {"bsonType": "string", "minLength": 1},
+            "is_read": {"bsonType": "bool"},
+            "status": {"enum": ["pending", "accepted", "rejected", "sent"]},
+            "group_id": {"bsonType": ["string", "null"], "pattern": REGEX_GROUP_ID},
+            "link": {"bsonType": ["string", "null"]},
+            "metadata": {"bsonType": "object"},
             "created_at": {"bsonType": "date"},
         },
         "additionalProperties": False,

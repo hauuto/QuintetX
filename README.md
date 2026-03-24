@@ -70,12 +70,25 @@ Bạn có thể tạo file `.env` ở thư mục gốc để override cấu hìn
 MONGODB_URI=mongodb://localhost:27017
 DATABASE_NAME=quintetx
 MONGODB_SERVER_SELECTION_TIMEOUT_MS=60000
+APP_ENV=dev
+AUTO_SEED_ON_STARTUP=true
+INITIAL_ADMIN_USERNAME=admin
+INITIAL_ADMIN_PASSWORD=admin
+INITIAL_ADMIN_EMAIL=admin@quintetx.local
+INITIAL_ADMIN_FULL_NAME=System Admin
+INITIAL_ADMIN_MSSV=00000000
 ```
 
 Khi startup thành công lần đầu, hệ thống sẽ tự khởi tạo database theo cơ chế idempotent:
 - Nếu collection/index đã tồn tại thì bỏ qua.
 - Seed local chỉ tạo nếu chưa có.
 - Seed mặc định: 3 user, 2 team (1 team 2 người, 1 team 1 người), 0 match.
+
+### Seed theo môi trường
+
+- `APP_ENV=dev`: hệ thống seed dữ liệu local (3 sinh viên, 2 nhóm) và tài khoản admin mặc định `admin/admin`.
+- `APP_ENV=prod`: hệ thống chỉ seed tài khoản admin đầu tiên (`admin/admin`) để bootstrap đăng nhập quản trị.
+- Có thể tắt toàn bộ seed bằng `AUTO_SEED_ON_STARTUP=false`.
 
 ### Cách 1: Chạy bằng dòng lệnh (Terminal)
 
@@ -137,6 +150,38 @@ poetry remove requests
 Tai lieu request/response cho dang ky, dang nhap:
 
 - docs/auth-api.md
+
+## Chay 2 fake agents (SDK mau)
+
+Sau khi tao tran dau va lay duoc API key cho 2 doi, ban co the chay 2 file agent gia:
+
+- `agents/fake_agent_x.py`
+- `agents/fake_agent_o.py`
+
+### Bien moi truong can set
+
+Agent X:
+
+```powershell
+$env:SERVER_URL="http://127.0.0.1:8000"
+$env:TEAM_X_ID="<team_id_x>"
+$env:TEAM_X_API_KEY="<api_key_x>"
+poetry run python agents/fake_agent_x.py
+```
+
+Agent O:
+
+```powershell
+$env:SERVER_URL="http://127.0.0.1:8000"
+$env:TEAM_O_ID="<team_id_o>"
+$env:TEAM_O_API_KEY="<api_key_o>"
+poetry run python agents/fake_agent_o.py
+```
+
+Tuy chinh them (co gia tri mac dinh):
+
+- `POLL_INTERVAL_SECONDS` (mac dinh `0.7`)
+- `HEARTBEAT_INTERVAL_SECONDS` (mac dinh `5.0`)
 
 ## Cấu trúc dự án
 

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-import secrets
+from datetime import timedelta
 import re
 
+import jwt
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -36,6 +37,16 @@ class AdminLoginRequest(BaseModel):
 
 def _normalize_text(value: str) -> str:
     return value.strip()
+
+
+def _issue_access_token(user: dict) -> str:
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload = {
+        "sub": user.get("_id"),
+        "role": user.get("role"),
+        "exp": expires_at,
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
 @router.post("/register/student")
@@ -125,7 +136,7 @@ async def login_student(payload: StudentLoginRequest):
             "message": "Invalid credentials",
         }
 
-    access_token = secrets.token_urlsafe(32)
+    access_token = _issue_access_token(user)
 
     return {
         "status": "success",
@@ -174,7 +185,7 @@ async def login_admin(payload: AdminLoginRequest):
             "message": "Invalid credentials",
         }
 
-    access_token = secrets.token_urlsafe(32)
+    access_token = _issue_access_token(user)
 
     return {
         "status": "success",

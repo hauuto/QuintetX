@@ -1,7 +1,7 @@
 {% extends "admin/base_admin.html" %}
 
 {% block admin_content %}
-<div class="flex h-[calc(100vh-8rem)] flex-col lg:flex-row gap-6" x-data="adminMatch()">
+<div class="flex h-[calc(100vh-8rem)] flex-col lg:flex-row gap-6" x-data="adminMatch()" x-init="init()">
 
     <!-- Left: Game Board Area -->
     <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden relative">
@@ -21,7 +21,7 @@
             </div>
 
             <!-- Right: Create Room Button -->
-            <button class="bg-[#3547E5] hover:bg-blue-700 text-white text-xs font-bold uppercase px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center">
+            <button @click="openCreateModal()" class="bg-[#3547E5] hover:bg-blue-700 text-white text-xs font-bold uppercase px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                 Tạo phòng mới
             </button>
@@ -108,14 +108,14 @@
                 <div class="flex items-center justify-between p-2 rounded bg-blue-50 border border-blue-100">
                     <div class="flex items-center">
                         <span class="w-6 h-6 rounded flex items-center justify-center bg-[#3547E5] text-white text-xs font-bold mr-2">X</span>
-                        <span class="font-bold text-gray-900 text-sm">{{ match.teams.X.name }}</span>
+                        <span class="font-bold text-gray-900 text-sm" x-text="match?.teams?.X?.name || ''"></span>
                     </div>
                 </div>
 
                 <div class="flex items-center justify-between p-2 rounded bg-white hover:bg-gray-50 border border-gray-100">
                     <div class="flex items-center">
                         <span class="w-6 h-6 rounded flex items-center justify-center bg-[#E53535] text-white text-xs font-bold mr-2">O</span>
-                        <span class="font-bold text-gray-900 text-sm">{{ match.teams.O.name }}</span>
+                        <span class="font-bold text-gray-900 text-sm" x-text="match?.teams?.O?.name || ''"></span>
                     </div>
                 </div>
             </div>
@@ -169,26 +169,194 @@
 
     </div>
 
+    <!-- Create Match Modal -->
+    <div x-show="showCreateModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="closeCreateModal()">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden" @click.stop="">
+        <!-- Header -->
+        <div class="bg-gray-50 border-b border-gray-100 px-6 py-4 flex justify-between items-center">
+            <h2 class="text-lg font-bold text-gray-900">Tạo trận đấu mới</h2>
+            <button @click="closeCreateModal()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div class="px-6 py-4 space-y-4">
+            <!-- Team X Dropdown -->
+            <div>
+                <label class="block text-xs font-bold text-gray-700 mb-2 uppercase">Đội X</label>
+                <select x-model="createForm.x_team_id" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                    <option value="">-- Chọn đội --</option>
+                    <template x-for="team in availableTeams" :key="team.id">
+                        <option :value="team.id" x-text="`${team.name} (${team.group_code})`"></option>
+                    </template>
+                </select>
+                <p class="text-xs text-red-500 mt-1" x-show="createErrors.x_team_id" x-text="createErrors.x_team_id"></p>
+            </div>
+
+            <!-- Team O Dropdown -->
+            <div>
+                <label class="block text-xs font-bold text-gray-700 mb-2 uppercase">Đội O</label>
+                <select x-model="createForm.o_team_id" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                    <option value="">-- Chọn đội --</option>
+                    <template x-for="team in availableTeams" :key="team.id">
+                        <option :value="team.id" x-text="`${team.name} (${team.group_code})`"></option>
+                    </template>
+                </select>
+                <p class="text-xs text-red-500 mt-1" x-show="createErrors.o_team_id" x-text="createErrors.o_team_id"></p>
+            </div>
+
+            <!-- Start Time -->
+            <div>
+                <label class="block text-xs font-bold text-gray-700 mb-2 uppercase">Thời gian bắt đầu</label>
+                <input type="datetime-local" x-model="createForm.start_time" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                <p class="text-xs text-red-500 mt-1" x-show="createErrors.start_time" x-text="createErrors.start_time"></p>
+            </div>
+
+            <!-- Room Name (Optional) -->
+            <div>
+                <label class="block text-xs font-bold text-gray-700 mb-2 uppercase">Tên phòng (tùy chọn)</label>
+                <input type="text" x-model="createForm.room_name" placeholder="Để trống để tự động sinh" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500">
+                <p class="text-xs text-red-500 mt-1" x-show="createErrors.room_name" x-text="createErrors.room_name"></p>
+            </div>
+
+            <!-- General Error -->
+            <p class="text-xs text-red-500" x-show="createErrors.general" x-text="createErrors.general"></p>
+        </div>
+
+        <!-- Footer -->
+        <div class="bg-gray-50 border-t border-gray-100 px-6 py-3 flex gap-2 justify-end">
+            <button @click="closeCreateModal()" class="px-4 py-2 text-sm font-bold text-gray-700 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors">
+                Hủy
+            </button>
+            <button @click="submitCreateMatch()" :disabled="isCreating" class="px-4 py-2 text-sm font-bold text-white bg-[#3547E5] hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <span x-show="!isCreating">Tạo</span>
+                <span x-show="isCreating">Đang tạo...</span>
+            </button>
+        </div>
+    </div>
+    </div>
+
+    <!-- Success Modal with API Keys -->
+    <div x-show="showSuccessModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="closeSuccessModal()">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 overflow-hidden" @click.stop="">
+        <!-- Header -->
+        <div class="bg-gray-50 border-b border-gray-100 px-6 py-4">
+            <h2 class="text-lg font-bold text-gray-900">✓ Trận đấu đã được tạo</h2>
+        </div>
+
+        <!-- Body -->
+        <div class="px-6 py-4 space-y-4">
+            <!-- Match Info -->
+            <div class="bg-blue-50 border border-blue-100 rounded-lg p-4">
+                <p class="text-sm font-bold text-gray-900 mb-2">Thông tin trận đấu</p>
+                <div class="space-y-1">
+                    <p class="text-xs text-gray-600">ID: <span class="font-mono font-bold text-gray-900" x-text="createdMatch?.id"></span></p>
+                    <p class="text-xs text-gray-600">Tên phòng: <span class="font-bold text-gray-900" x-text="createdMatch?.room_name"></span></p>
+                </div>
+            </div>
+
+            <!-- Team X Keys -->
+            <div class="border border-gray-200 rounded-lg p-4">
+                <p class="text-sm font-bold text-gray-900 mb-3 flex items-center">
+                    <span class="w-5 h-5 rounded bg-[#3547E5] text-white text-xs font-bold flex items-center justify-center mr-2">X</span>
+                    Đội X
+                </p>
+                <div class="space-y-2">
+                    <div class="flex items-center gap-2">
+                        <input type="text" readonly :value="createdMatch?.teams?.X?.team_id" class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded text-xs font-mono">
+                        <button @click="copyToClipboard(createdMatch?.teams?.X?.team_id)" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-bold text-gray-700 transition-colors">
+                            Sao chép
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="text" readonly :value="createdMatch?.teams?.X?.api_key" class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded text-xs font-mono">
+                        <button @click="copyToClipboard(createdMatch?.teams?.X?.api_key)" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-bold text-gray-700 transition-colors">
+                            Sao chép
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Team O Keys -->
+            <div class="border border-gray-200 rounded-lg p-4">
+                <p class="text-sm font-bold text-gray-900 mb-3 flex items-center">
+                    <span class="w-5 h-5 rounded bg-[#E53535] text-white text-xs font-bold flex items-center justify-center mr-2">O</span>
+                    Đội O
+                </p>
+                <div class="space-y-2">
+                    <div class="flex items-center gap-2">
+                        <input type="text" readonly :value="createdMatch?.teams?.O?.team_id" class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded text-xs font-mono">
+                        <button @click="copyToClipboard(createdMatch?.teams?.O?.team_id)" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-bold text-gray-700 transition-colors">
+                            Sao chép
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="text" readonly :value="createdMatch?.teams?.O?.api_key" class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded text-xs font-mono">
+                        <button @click="copyToClipboard(createdMatch?.teams?.O?.api_key)" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-bold text-gray-700 transition-colors">
+                            Sao chép
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Environment Variable Template -->
+            <div class="border border-gray-200 rounded-lg p-4">
+                <p class="text-sm font-bold text-gray-900 mb-2">Mẫu Environment Variables</p>
+                <div class="bg-gray-50 rounded p-3 font-mono text-xs leading-relaxed max-h-32 overflow-auto">
+                    <div>TEAM_X_ID=<span x-text="createdMatch?.teams?.X?.team_id"></span></div>
+                    <div>TEAM_X_API_KEY=<span x-text="createdMatch?.teams?.X?.api_key"></span></div>
+                    <div>TEAM_O_ID=<span x-text="createdMatch?.teams?.O?.team_id"></span></div>
+                    <div>TEAM_O_API_KEY=<span x-text="createdMatch?.teams?.O?.api_key"></span></div>
+                    <div>SERVER_URL=http://localhost:8000</div>
+                </div>
+                <button @click="copyEnvTemplate()" class="mt-2 w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-xs font-bold text-gray-700 transition-colors">
+                    Sao chép toàn bộ Environment
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="bg-gray-50 border-t border-gray-100 px-6 py-3 flex justify-end gap-2">
+            <button @click="closeSuccessModal()" class="px-4 py-2 text-sm font-bold text-white bg-[#3547E5] hover:bg-blue-700 rounded-lg transition-colors">
+                Đóng
+            </button>
+        </div>
+    </div>
+    </div>
+
 </div>
 
 <script>
     function adminMatch() {
         return {
             isPlaying: false,
-            timeDisplay: '{{ match.time_elapsed }}',
-            currentStep: {{ match.history|length }},
-            totalSteps: {{ match.history|length }},
+            timeDisplay: '00:00',
+            currentStep: 0,
+            totalSteps: 0,
             speed: '1',
-            history: [
-                {% for move in match.history %}
-                {
-                    id: {{ move.order or loop.index }},
-                    team: '{{ move.team }}',
-                    x: {{ move.x }},
-                    y: {{ move.y }}
-                },
-                {% endfor %}
-            ],
+            history: [],
+            match: null,
+
+            // Create match modal state
+            showCreateModal: false,
+            showSuccessModal: false,
+            isCreating: false,
+            availableTeams: [],
+            createForm: {
+                x_team_id: '',
+                o_team_id: '',
+                start_time: '',
+                room_name: '',
+            },
+            createErrors: {
+                x_team_id: '',
+                o_team_id: '',
+                start_time: '',
+                room_name: '',
+                general: '',
+            },
+            createdMatch: null,
 
             get lastMove() {
                 if (this.currentStep === 0) return null;
@@ -207,8 +375,6 @@
                     timestamp: new Date().toISOString()
                 }, null, 2);
             },
-// ...existing code...
-
 
             togglePlay() {
                 this.isPlaying = !this.isPlaying;
@@ -224,7 +390,173 @@
 
             seek() {
                 // Logic to update board state based on currentStep
-            }
+            },
+
+            getDefaultStartTime() {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                return `${year}-${month}-${day}T${hours}:${minutes}`;
+            },
+
+            async openCreateModal() {
+                this.showCreateModal = true;
+                this.resetCreateForm();
+                await this.loadTeamOptions();
+            },
+
+            closeCreateModal() {
+                this.showCreateModal = false;
+                this.resetCreateForm();
+            },
+
+            closeSuccessModal() {
+                this.showSuccessModal = false;
+                this.createdMatch = null;
+            },
+
+            resetCreateForm() {
+                const defaultTime = this.getDefaultStartTime();
+                this.createForm = {
+                    x_team_id: '',
+                    o_team_id: '',
+                    start_time: defaultTime,
+                    room_name: '',
+                };
+                this.createErrors = {
+                    x_team_id: '',
+                    o_team_id: '',
+                    start_time: '',
+                    room_name: '',
+                    general: '',
+                };
+            },
+
+            init() {
+                console.log('[AdminMatch] Initialized');
+                this.resetCreateForm();
+                this.loadLatestMatch();
+            },
+
+            async loadTeamOptions() {
+                try {
+                    const json = await window.QXApi.request('/api/v1/matches/teams/options', {
+                        method: 'GET',
+                    });
+                    this.availableTeams = json.data.teams || [];
+                } catch (error) {
+                    console.error('Failed to load team options:', error);
+                }
+            },
+
+            validateCreateForm() {
+                this.createErrors = {
+                    x_team_id: '',
+                    o_team_id: '',
+                    start_time: '',
+                    room_name: '',
+                    general: '',
+                };
+
+                if (!this.createForm.x_team_id) {
+                    this.createErrors.x_team_id = 'Vui lòng chọn đội X';
+                    return false;
+                }
+                if (!this.createForm.o_team_id) {
+                    this.createErrors.o_team_id = 'Vui lòng chọn đội O';
+                    return false;
+                }
+                if (this.createForm.x_team_id === this.createForm.o_team_id) {
+                    this.createErrors.general = 'Hai đội phải khác nhau';
+                    return false;
+                }
+                if (!this.createForm.start_time) {
+                    this.createErrors.start_time = 'Vui lòng chọn thời gian bắt đầu';
+                    return false;
+                }
+                return true;
+            },
+
+            async submitCreateMatch() {
+                if (!this.validateCreateForm()) return;
+
+                this.isCreating = true;
+                try {
+                    const payload = {
+                        x_team_id: this.createForm.x_team_id,
+                        o_team_id: this.createForm.o_team_id,
+                        start_time: this.convertToISO(this.createForm.start_time),
+                        room_name: this.createForm.room_name || null,
+                    };
+
+                    const json = await window.QXApi.request('/api/v1/matches', {
+                        method: 'POST',
+                        body: JSON.stringify(payload),
+                    });
+
+                    this.createdMatch = json.data.match;
+                    this.showCreateModal = false;
+                    this.showSuccessModal = true;
+                    this.setActiveMatch(this.createdMatch);
+                } catch (error) {
+                    console.error('Error creating match:', error);
+                    this.createErrors.general = 'Lỗi hệ thống: ' + error.message;
+                } finally {
+                    this.isCreating = false;
+                }
+            },
+
+            convertToISO(datetimeLocal) {
+                const date = new Date(datetimeLocal);
+                return date.toISOString();
+            },
+
+            copyToClipboard(text) {
+                if (!text) return;
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('Đã sao chép!');
+                });
+            },
+
+            copyEnvTemplate() {
+                const env = `TEAM_X_ID=${this.createdMatch?.teams?.X?.team_id || ''}
+TEAM_X_API_KEY=${this.createdMatch?.teams?.X?.api_key || ''}
+TEAM_O_ID=${this.createdMatch?.teams?.O?.team_id || ''}
+TEAM_O_API_KEY=${this.createdMatch?.teams?.O?.api_key || ''}
+SERVER_URL=http://localhost:8000`;
+                navigator.clipboard.writeText(env).then(() => {
+                    alert('Đã sao chép Environment Variables!');
+                });
+            },
+
+            setActiveMatch(match) {
+                if (!match) return;
+                this.match = match;
+                this.history = match.history || [];
+                this.totalSteps = (match.history || []).length;
+                this.currentStep = this.totalSteps;
+            },
+
+            async loadLatestMatch() {
+                try {
+                    const json = await window.QXApi.request('/api/v1/matches/overview', {
+                        method: 'GET',
+                    });
+
+                    const data = json.data || {};
+                    const pick = (data.current_matches && data.current_matches[0])
+                        || (data.upcoming_matches && data.upcoming_matches[0])
+                        || (data.finished_matches && data.finished_matches[0])
+                        || null;
+
+                    this.setActiveMatch(pick);
+                } catch (error) {
+                    console.error('Failed to load latest match:', error);
+                }
+            },
         }
     }
 </script>
