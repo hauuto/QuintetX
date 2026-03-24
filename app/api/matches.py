@@ -390,7 +390,7 @@ async def get_my_match(current_user: dict[str, Any] = Depends(get_current_user))
         }
 
     my_match_query = {
-        "status": "playing",
+        "status": {"$in": ["waiting", "playing"]},
         "$or": [{"teams.X.team_id": group_id}, {"teams.O.team_id": group_id}],
     }
     my_match = await database[MATCHES_COLLECTION].find_one(my_match_query)
