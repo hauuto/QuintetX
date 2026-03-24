@@ -114,15 +114,108 @@
     <!-- Main Content -->
     <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
         <!-- Header -->
-        <header class="h-16 bg-white border-b border-gray-100 flex items-center justify-end px-8 space-x-4 shadow-sm z-10">
-            <!-- Bell Icon -->
-            <button class="text-gray-400 hover:text-gray-600 transition-colors">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-            </button>
-            <!-- Gear Icon -->
-            <button class="text-gray-400 hover:text-gray-600 transition-colors">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-            </button>
+        <header class="h-16 bg-white border-b border-gray-100 flex items-center justify-end px-8 space-x-4 shadow-sm z-10"
+                x-data="{
+                    showNotifications: false,
+                    showSettings: false,
+                    notifications: [],
+                    unreadCount: 0,
+                    async fetchNotifications() {
+                        try {
+                            const res = await fetch('/api/v1/notifications', {
+                                headers: { 'Authorization': `Bearer ${localStorage.getItem('qx_access_token')}` }
+                            });
+                            if (res.ok) {
+                                this.notifications = await res.json();
+                                this.unreadCount = this.notifications.filter(n => !n.is_read).length;
+                            }
+                        } catch (e) { console.error('Failed to fetch notifications:', e); }
+                    },
+                    async markAsRead(id) {
+                        try {
+                            await fetch(`/api/v1/notifications/${id}/read`, {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${localStorage.getItem('qx_access_token')}` }
+                            });
+                            this.fetchNotifications();
+                        } catch (e) { console.error(e); }
+                    },
+                    async markAllRead() {
+                        try {
+                            await fetch('/api/v1/notifications/read-all', {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${localStorage.getItem('qx_access_token')}` }
+                            });
+                            this.fetchNotifications();
+                        } catch (e) { console.error(e); }
+                    },
+                    formatTime(isoString) {
+                        const date = new Date(isoString);
+                        return date.toLocaleString('vi-VN');
+                    }
+                }"
+                x-init="fetchNotifications()">
+
+            <!-- Notifications Dropdown -->
+            <div class="relative">
+                <button @click="showNotifications = !showNotifications; showSettings = false" @click.away="showNotifications = false" class="relative text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    <!-- Unread badge -->
+                    <span x-show="unreadCount > 0" x-text="unreadCount" class="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full"></span>
+                </button>
+
+                <!-- Dropdown panel -->
+                <div x-show="showNotifications" x-transition.opacity duration.200ms class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-100 z-50 overflow-hidden" style="display: none;">
+                    <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                        <h3 class="text-sm font-semibold text-gray-900">Thông báo</h3>
+                        <button x-show="unreadCount > 0" @click="markAllRead()" class="text-xs text-[#3547E5] hover:underline focus:outline-none">Đánh dấu tất cả đã đọc</button>
+                    </div>
+                    <div class="max-h-96 overflow-y-auto">
+                        <template x-if="notifications.length === 0">
+                            <div class="px-4 py-6 text-center text-sm text-gray-500">
+                                Không có thông báo nào.
+                            </div>
+                        </template>
+                        <template x-for="notif in notifications" :key="notif.id">
+                            <div class="px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors" :class="!notif.is_read ? 'bg-blue-50/50' : ''">
+                                <div class="flex items-start">
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm text-gray-900" :class="!notif.is_read ? 'font-semibold' : ''" x-text="notif.message"></p>
+                                        <div class="mt-1 flex items-center justify-between">
+                                            <p class="text-xs text-gray-500" x-text="formatTime(notif.created_at)"></p>
+                                            <template x-if="notif.link">
+                                                <a :href="notif.link" class="text-xs text-[#3547E5] hover:underline">Xem chi tiết</a>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <template x-if="!notif.is_read">
+                                        <button @click="markAsRead(notif.id)" class="ml-2 mt-1 w-2.5 h-2.5 bg-[#3547E5] rounded-full flex-shrink-0" title="Đánh dấu đã đọc"></button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Dropdown -->
+            <div class="relative">
+                <button @click="showSettings = !showSettings; showNotifications = false" @click.away="showSettings = false" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                </button>
+
+                <!-- Dropdown panel -->
+                <div x-show="showSettings" x-transition.opacity duration.200ms class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 overflow-hidden" style="display: none;">
+                    <div class="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                        <p class="text-sm font-semibold text-gray-900" x-text="currentUser.full_name"></p>
+                        <p class="text-xs text-gray-500 truncate" x-text="currentUser.email || 'Admin'"></p>
+                    </div>
+                    <div class="py-1">
+                        <a href="/admin/approvals" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Cài đặt tài khoản</a>
+                        <button @click="logout()" class="w-full text-left block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Đăng xuất</button>
+                    </div>
+                </div>
+            </div>
         </header>
 
         <!-- Scrollable Content Area -->
