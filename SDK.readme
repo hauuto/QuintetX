@@ -80,6 +80,16 @@ client = QuintetXClient("http://127.0.0.1:8000", "T0001padjsl92", "YOUR_API_KEY"
 client.run(first_empty)
 ```
 
+## File mẫu
+
+Repo có file mẫu `sdk_example_agent.py`.
+
+Chạy:
+
+```bash
+python sdk_example_agent.py --server-url http://127.0.0.1:8000 --team-id T0001padjsl92 --api-key YOUR_API_KEY
+```
+
 `run()` sẽ:
 - `connect()` (mặc định)
 - poll `GET /api/v1/agent/state`
