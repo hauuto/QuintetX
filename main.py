@@ -158,6 +158,7 @@ async def admin_teams(request: Request):
             "_id": 1,
             "name": 1,
             "members": 1,
+            "leader_id": 1,
             "created_at": 1,
         },
     ).sort("created_at", -1).to_list(length=500)
@@ -165,11 +166,23 @@ async def admin_teams(request: Request):
     teams = []
     for group in groups:
         members = group.get("members") or []
+        leader_id = group.get("leader_id")
+
+        members_data = []
+        for m in members:
+            members_data.append({
+                "user_id": m.get("user_id"),
+                "mssv": m.get("mssv"),
+                "full_name": m.get("full_name", ""),
+                "is_leader": m.get("user_id") == leader_id
+            })
+
         teams.append(
             {
                 "id": group.get("_id", ""),
                 "name": group.get("name", ""),
                 "members_count": len(members),
+                "members": members_data,
                 "status": "Active",
                 "created_at": _format_date(group.get("created_at")),
             }
