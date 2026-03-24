@@ -78,6 +78,11 @@ async def login_page(request: Request):
 async def register_page(request: Request):
     return templates.TemplateResponse("register_student.html", {"request": request})
 
+
+@app.get("/401", response_class=HTMLResponse)
+async def unauthorized_page(request: Request):
+    return templates.TemplateResponse("401.html", {"request": request})
+
 @app.get("/student/dashboard", response_class=HTMLResponse)
 async def student_dashboard(request: Request):
     return templates.TemplateResponse("student/dashboard.html", {"request": request})

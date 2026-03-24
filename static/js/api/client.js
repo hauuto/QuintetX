@@ -1,7 +1,44 @@
 (function () {
+    let isRedirectingToLogin = false;
+
     function getToken() {
         return localStorage.getItem('qx_access_token') || '';
     }
+
+    function getLoginPath() {
+        const currentPath = window.location.pathname || '';
+        if (currentPath.startsWith('/admin')) {
+            return '/admin/login';
+        }
+        return '/login';
+    }
+
+    function redirectToLoginImmediately() {
+        if (isRedirectingToLogin) {
+            return;
+        }
+        isRedirectingToLogin = true;
+        localStorage.removeItem('qx_access_token');
+        localStorage.removeItem('qx_user');
+        const loginPath = getLoginPath();
+        const fromPath = window.location.pathname || '/';
+        const unauthorizedUrl = `/401?next=${encodeURIComponent(loginPath)}&from=${encodeURIComponent(fromPath)}`;
+        window.location.replace(unauthorizedUrl);
+    }
+
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async function (input, init) {
+        const response = await originalFetch(input, init);
+
+        const url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+        const isApiCall = url.includes('/api/v1/');
+
+        if (isApiCall && response.status === 401) {
+            redirectToLoginImmediately();
+        }
+
+        return response;
+    };
 
     async function request(path, options) {
         const opts = options || {};
@@ -15,11 +52,16 @@
             headers['Content-Type'] = 'application/json';
         }
 
-        const response = await fetch(path, {
+        const response = await window.fetch(path, {
             method,
             headers,
             body: opts.body,
         });
+
+        if (response.status === 401) {
+            redirectToLoginImmediately();
+            throw new Error('Unauthorized');
+        }
 
         let payload = null;
         try {

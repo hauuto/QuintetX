@@ -78,6 +78,12 @@
             });
         },
 
+        async markAllNotificationsRead() {
+            return window.QXApi.request('/api/v1/groups/notifications/read-all', {
+                method: 'PATCH',
+            });
+        },
+
         async acceptInvite(notificationId) {
             return window.QXApi.request(`/api/v1/groups/invites/${notificationId}/accept`, {
                 method: 'POST',

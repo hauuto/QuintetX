@@ -685,6 +685,19 @@ async def get_my_notifications(
     return {"status": "success", "data": {"notifications": enriched}, "message": ""}
 
 
+@router.patch("/notifications/read-all")
+async def mark_all_notifications_read(current_user: dict[str, Any] = Depends(get_current_user)):
+    database = get_database()
+    await database[NOTIFICATIONS_COLLECTION].update_many(
+        {
+            "user_id": current_user.get("_id"),
+            "is_read": False,
+        },
+        {"$set": {"is_read": True}},
+    )
+    return {"status": "success", "data": {}, "message": ""}
+
+
 @router.patch("/notifications/{notification_id}/read")
 async def mark_notification_read(
     notification_id: str,
