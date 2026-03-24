@@ -151,6 +151,38 @@ Tai lieu request/response cho dang ky, dang nhap:
 
 - docs/auth-api.md
 
+## Chay 2 fake agents (SDK mau)
+
+Sau khi tao tran dau va lay duoc API key cho 2 doi, ban co the chay 2 file agent gia:
+
+- `agents/fake_agent_x.py`
+- `agents/fake_agent_o.py`
+
+### Bien moi truong can set
+
+Agent X:
+
+```powershell
+$env:SERVER_URL="http://127.0.0.1:8000"
+$env:TEAM_X_ID="<team_id_x>"
+$env:TEAM_X_API_KEY="<api_key_x>"
+poetry run python agents/fake_agent_x.py
+```
+
+Agent O:
+
+```powershell
+$env:SERVER_URL="http://127.0.0.1:8000"
+$env:TEAM_O_ID="<team_id_o>"
+$env:TEAM_O_API_KEY="<api_key_o>"
+poetry run python agents/fake_agent_o.py
+```
+
+Tuy chinh them (co gia tri mac dinh):
+
+- `POLL_INTERVAL_SECONDS` (mac dinh `0.7`)
+- `HEARTBEAT_INTERVAL_SECONDS` (mac dinh `5.0`)
+
 ## Cấu trúc dự án
 
 ```

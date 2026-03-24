@@ -180,10 +180,16 @@ async def _ensure_indexes(database: Any) -> None:
         unique=True,
     )
 
+    # room_name is NOT unique (duplicate room names are allowed).
+    # Best-effort drop of legacy unique index if it exists.
+    try:
+        await database[MATCHES_COLLECTION].drop_index("uq_matches_room_name")
+    except Exception:
+        pass
+
     await database[MATCHES_COLLECTION].create_index(
         [("room_name", 1)],
-        name="uq_matches_room_name",
-        unique=True,
+        name="idx_matches_room_name",
     )
 
     await database[MATCHES_COLLECTION].create_index(

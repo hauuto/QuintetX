@@ -104,7 +104,11 @@ def _build_match_payload(
         "status": match.get("status"),
         "current_turn": match.get("current_turn"),
         "winner": match.get("winner"),
+        "finish_reason": match.get("finish_reason"),
         "start_time": _to_iso(match.get("start_time")),
+        "started_at": _to_iso(match.get("started_at")),
+        "finished_at": _to_iso(match.get("finished_at")),
+        "turn_deadline_at": _to_iso(match.get("turn_deadline_at")),
         "created_at": _to_iso(match.get("created_at")),
         "teams": {
             "X": {
@@ -121,6 +125,17 @@ def _build_match_payload(
             },
         },
         "history": _normalize_history(match.get("history", [])),
+        "events": [
+            {
+                "type": item.get("type"),
+                "message": item.get("message"),
+                "side": item.get("side"),
+                "team_id": item.get("team_id"),
+                "payload": item.get("payload") or {},
+                "created_at": _to_iso(item.get("created_at")),
+            }
+            for item in match.get("events", [])[-100:]
+        ],
     }
 
     if include_board:
@@ -227,16 +242,11 @@ async def create_match(payload: CreateMatchRequest, current_user: dict[str, Any]
         }
 
     now = _now_utc()
-    match_status = "playing" if start_time <= now else "waiting"
+    # Always create in "waiting". Match should start when both agents are ready.
+    match_status = "waiting"
     room_name = (payload.room_name or "").strip() or f"{team_name_map.get(x_team_id, x_team_id)} vs {team_name_map.get(o_team_id, o_team_id)}"
 
-    duplicated_room = await database[MATCHES_COLLECTION].find_one({"room_name": room_name}, {"_id": 1})
-    if duplicated_room:
-        return {
-            "status": "error",
-            "data": {},
-            "message": "Room name already exists",
-        }
+    # Room names are allowed to be duplicated.
 
     match_id = await _generate_unique_match_id()
     x_api_key = _generate_api_key()
@@ -264,7 +274,25 @@ async def create_match(payload: CreateMatchRequest, current_user: dict[str, Any]
         "current_turn": "X",
         "winner": None,
         "history": [],
+        "events": [
+            {
+                "type": "match_created",
+                "message": "Trận đấu đã được tạo.",
+                "side": None,
+                "team_id": None,
+                "payload": {
+                    "created_by": current_user.get("_id"),
+                    "x_team_id": x_team_id,
+                    "o_team_id": o_team_id,
+                },
+                "created_at": now,
+            }
+        ],
         "start_time": start_time,
+        "started_at": None,
+        "finished_at": None,
+        "turn_deadline_at": None,
+        "finish_reason": None,
         "created_at": now,
     }
 
@@ -302,6 +330,11 @@ async def list_matches_overview(current_user: dict[str, Any] = Depends(get_curre
             "created_at": 1,
             "teams": 1,
             "history": 1,
+            "events": 1,
+            "started_at": 1,
+            "finished_at": 1,
+            "turn_deadline_at": 1,
+            "finish_reason": 1,
         },
     ).sort("start_time", -1).to_list(length=300)
 
@@ -408,6 +441,11 @@ async def get_my_match(current_user: dict[str, Any] = Depends(get_current_user))
             "created_at": 1,
             "teams": 1,
             "history": 1,
+            "events": 1,
+            "started_at": 1,
+            "finished_at": 1,
+            "turn_deadline_at": 1,
+            "finish_reason": 1,
         },
     ).sort("start_time", -1).to_list(length=300)
 
@@ -444,5 +482,38 @@ async def get_my_match(current_user: dict[str, Any] = Depends(get_current_user))
                 "finished_matches": finished_matches,
             },
         },
+        "message": "",
+    }
+
+
+@router.get("/{match_id}/events")
+async def get_match_events(
+    match_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+    limit: int = 100,
+):
+    del current_user
+    database = get_database()
+    match = await database[MATCHES_COLLECTION].find_one({"_id": match_id}, {"events": 1})
+
+    if not match:
+        return {"status": "error", "data": {}, "message": "Match not found"}
+
+    raw_events = match.get("events", [])
+    events = [
+        {
+            "type": item.get("type"),
+            "message": item.get("message"),
+            "side": item.get("side"),
+            "team_id": item.get("team_id"),
+            "payload": item.get("payload") or {},
+            "created_at": _to_iso(item.get("created_at")),
+        }
+        for item in raw_events[-max(1, min(limit, 300)):]
+    ]
+
+    return {
+        "status": "success",
+        "data": {"events": events},
         "message": "",
     }

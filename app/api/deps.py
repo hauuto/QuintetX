@@ -7,7 +7,7 @@ from fastapi import Depends, Header, HTTPException
 
 from app.core.config import settings
 from app.db.client import get_database
-from app.db.init_db import USERS_COLLECTION
+from app.db.init_db import MATCHES_COLLECTION, USERS_COLLECTION
 
 
 def _extract_bearer_token(authorization: str | None) -> str:
@@ -47,3 +47,39 @@ async def get_current_user(authorization: str | None = Header(default=None)) -> 
 
 
 CurrentUser = Depends(get_current_user)
+
+
+async def get_agent_session(
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_team_id: str | None = Header(default=None, alias="X-Team-ID"),
+) -> dict[str, Any]:
+    if not x_api_key or not x_team_id:
+        raise HTTPException(status_code=401, detail="Missing X-API-Key or X-Team-ID")
+
+    database = get_database()
+    match = await database[MATCHES_COLLECTION].find_one(
+        {
+            "$or": [
+                {"teams.X.team_id": x_team_id, "teams.X.api_key": x_api_key},
+                {"teams.O.team_id": x_team_id, "teams.O.api_key": x_api_key},
+            ],
+            "status": {"$in": ["waiting", "playing", "finished"]},
+        }
+    )
+
+    if not match:
+        raise HTTPException(status_code=401, detail="Invalid agent credentials")
+
+    side = "X"
+    if match.get("teams", {}).get("X", {}).get("team_id") != x_team_id:
+        side = "O"
+
+    return {
+        "match": match,
+        "side": side,
+        "team_id": x_team_id,
+        "api_key": x_api_key,
+    }
+
+
+AgentSession = Depends(get_agent_session)

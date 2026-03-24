@@ -102,6 +102,25 @@
                     </div>
                 </div>
 
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 h-52 flex flex-col overflow-hidden">
+                    <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                        <h3 class="text-xs font-bold text-gray-900 uppercase">Match Event Log</h3>
+                        <span class="text-[10px] font-semibold text-gray-500" x-text="currentMatch.events ? currentMatch.events.length : 0"></span>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-2 space-y-1">
+                        <template x-if="!currentMatch.events || currentMatch.events.length === 0">
+                            <p class="text-xs text-gray-400 px-2 py-1">Chưa có sự kiện.</p>
+                        </template>
+                        <template x-for="(eventItem, idx) in (currentMatch.events || []).slice().reverse()" :key="`${eventItem.created_at}-${idx}`">
+                            <div class="px-2 py-1.5 rounded border border-gray-100 bg-white">
+                                <p class="text-[11px] font-semibold text-gray-700" x-text="eventItem.type"></p>
+                                <p class="text-xs text-gray-900" x-text="eventItem.message"></p>
+                                <p class="text-[10px] text-gray-400" x-text="eventItem.created_at || ''"></p>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 shrink-0 flex items-center justify-between" x-data="{ copied: false }">
                     <div class="flex flex-col min-w-0 mr-3">
                         <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">API Key</h3>
@@ -188,6 +207,7 @@
             loading: true,
             currentMatch: null,
             myTeam: null,
+            pollTimerId: null,
             otherMatches: {
                 current_matches: [],
                 upcoming_matches: [],
@@ -199,10 +219,22 @@
 
             async init() {
                 await this.loadMyMatch();
+                this.startPolling();
             },
 
-            async loadMyMatch() {
-                this.loading = true;
+            startPolling() {
+                if (this.pollTimerId) {
+                    clearInterval(this.pollTimerId);
+                }
+                this.pollTimerId = setInterval(() => {
+                    this.loadMyMatch(false);
+                }, 1200);
+            },
+
+            async loadMyMatch(showLoading = true) {
+                if (showLoading) {
+                    this.loading = true;
+                }
                 try {
                     const result = await window.QXApi.matches.getMyMatch();
                     const data = result.data || {};
@@ -218,7 +250,9 @@
                         window.QXToast.show(error.message || 'Không thể tải dữ liệu trận đấu.', 'error');
                     }
                 } finally {
-                    this.loading = false;
+                    if (showLoading) {
+                        this.loading = false;
+                    }
                 }
             },
         };

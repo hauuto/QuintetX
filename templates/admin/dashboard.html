@@ -24,6 +24,7 @@
     x-init="initUser()"
 >
     {% set stats_data = stats if stats is defined and stats else {} %}
+    {% set recent = recent_activity if recent_activity is defined and recent_activity else [] %}
 
     <!-- Header -->
     <div>
@@ -108,25 +109,15 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                    {% if stats_data %}
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 text-sm text-gray-500">2 phút trước</td>
-                        <td class="px-6 py-4 text-sm font-semibold text-gray-900">Tạo phòng đấu</td>
-                        <td class="px-6 py-4 text-sm text-gray-600">Admin</td>
-                        <td class="px-6 py-4 text-sm text-gray-500">Phòng #102 created</td>
-                    </tr>
-                     <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 text-sm text-gray-500">15 phút trước</td>
-                        <td class="px-6 py-4 text-sm font-semibold text-gray-900">Đăng ký đội</td>
-                        <td class="px-6 py-4 text-sm text-gray-600">System</td>
-                        <td class="px-6 py-4 text-sm text-gray-500">Team "Alpha" registered</td>
-                    </tr>
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 text-sm text-gray-500">1 giờ trước</td>
-                        <td class="px-6 py-4 text-sm font-semibold text-gray-900">Kết thúc trận đấu</td>
-                        <td class="px-6 py-4 text-sm text-gray-600">System</td>
-                        <td class="px-6 py-4 text-sm text-gray-500">Match #45: Dragon vs Tiger (1-0)</td>
-                    </tr>
+                    {% if recent %}
+                        {% for item in recent %}
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4 text-sm text-gray-500">{{ item.time }}</td>
+                            <td class="px-6 py-4 text-sm font-semibold text-gray-900">{{ item.action }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-600">{{ item.actor }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">{{ item.detail }}</td>
+                        </tr>
+                        {% endfor %}
                     {% else %}
                     <tr>
                         <td class="px-6 py-6 text-sm text-gray-600" colspan="4">

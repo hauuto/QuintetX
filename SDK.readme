@@ -1,0 +1,106 @@
+# QuintetX Python SDK (single-file)
+
+SDK Python tối giản để viết AI agent chơi Gomoku/Caro trên QuintetX qua HTTP polling.
+
+- 1 file duy nhất: `QuintetX_SDK.py`
+- Không cần `.env`, không cần config phụ
+
+## Yêu cầu
+
+- Python 3.10+ (khuyến nghị)
+- `requests`
+
+Cài `requests`:
+
+```bash
+pip install requests
+```
+
+## Cài đặt
+
+Chỉ cần copy file `QuintetX_SDK.py` vào project của bạn.
+
+## Thông tin cần có
+
+Bạn cần 3 giá trị từ Admin/match:
+
+- `server_url` (ví dụ `http://127.0.0.1:8000`)
+- `team_id` (ví dụ `T0001padjsl92`)
+- `api_key` (key của đúng team trong đúng match)
+
+Agent auth bằng headers:
+
+- `X-Team-ID: <team_id>`
+- `X-API-Key: <api_key>`
+
+## Quickstart (tối giản)
+
+```python
+from QuintetX_SDK import QuintetXClient
+
+client = QuintetXClient(
+    server_url="http://127.0.0.1:8000",
+    team_id="T0001padjsl92",
+    api_key="YOUR_API_KEY",
+)
+
+# init + (mặc định) bắt đầu heartbeat nền
+init = client.connect()
+print("init:", init)
+print("side:", client.side)  # "X" hoặc "O"
+
+state = client.get_state()
+print("state:", state)
+
+# nếu đang chơi và đúng lượt thì đi thử 1 nước
+if state["status"] == "success":
+    data = state["data"]
+    if data["match_status"] == "playing" and data["turn"] == data["side"]:
+        print(client.send_move(20, 20))
+```
+
+## Chạy agent tự động (strategy loop)
+
+Bạn chỉ cần viết `strategy(state_data) -> (x, y)`.
+
+Ví dụ: đi vào ô trống đầu tiên:
+
+```python
+from QuintetX_SDK import QuintetXClient
+
+def first_empty(state_data: dict) -> tuple[int, int]:
+    board = state_data["board"]
+    for x in range(len(board)):
+        for y in range(len(board[x])):
+            if board[x][y] == 0:
+                return x, y
+    return 0, 0
+
+client = QuintetXClient("http://127.0.0.1:8000", "T0001padjsl92", "YOUR_API_KEY")
+client.run(first_empty)
+```
+
+`run()` sẽ:
+- `connect()` (mặc định)
+- poll `GET /api/v1/agent/state`
+- chỉ gửi move khi `match_status == "playing"` và tới lượt agent
+- dừng khi match `finished`
+
+## API của SDK
+
+- `connect()` → `POST /api/v1/agent/init`
+- `get_state()` → `GET /api/v1/agent/state`
+- `send_move(x, y)` → `POST /api/v1/agent/move`
+- `heartbeat_once()` → `POST /api/v1/agent/heartbeat`
+- `start_heartbeat()` / `stop_heartbeat()`
+- `run(strategy, ...)`
+
+## Ghi chú vận hành
+
+- Nếu server trả về response không phải JSON (ví dụ lỗi 500), SDK sẽ trả về object dạng:
+  - `{ "status": "error", "message": "Non-JSON response: ..." }`
+- Mỗi team chỉ được tham gia 1 match “active” tại một thời điểm (server sẽ chặn tạo match mới nếu team đang có match `waiting/playing`).
+
+## License
+
+Tuỳ repo bạn thiết lập.
