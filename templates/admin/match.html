@@ -9,6 +9,12 @@
         <div class="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-6 shrink-0 z-10">
             <!-- Left: Live Status -->
             <div class="flex items-center space-x-4">
+                 <!-- Back Button -->
+                 <a href="/admin/rooms" class="inline-flex items-center text-sm font-semibold text-gray-500 hover:text-[#3547E5] transition-colors border-r border-gray-200 pr-4 mr-2">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    Quay lại
+                 </a>
+
                  <!-- Status Indicator -->
                  <div class="flex items-center space-x-2">
                     <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" :class="{'bg-green-500': isPlaying, 'bg-yellow-500': !isPlaying}"></span>
