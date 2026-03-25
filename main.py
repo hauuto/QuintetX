@@ -151,13 +151,20 @@ async def admin_dashboard(request: Request):
 # Placeholder routes for sidebar links
 @app.get("/admin/teams", response_class=HTMLResponse)
 async def admin_teams(request: Request):
+    from app.db.init_db import SETTINGS_COLLECTION
     database = get_database()
+
+    settings_doc = await database[SETTINGS_COLLECTION].find_one({"_id": "moderation"})
+    is_moderation_enabled = settings_doc.get("group_moderation_enabled", False) if settings_doc else False
+
     groups = await database[GROUPS_COLLECTION].find(
         {},
         {
             "_id": 1,
             "name": 1,
             "members": 1,
+            "leader_id": 1,
+            "status": 1,
             "created_at": 1,
         },
     ).sort("created_at", -1).to_list(length=500)
@@ -165,17 +172,33 @@ async def admin_teams(request: Request):
     teams = []
     for group in groups:
         members = group.get("members") or []
+        leader_id = group.get("leader_id")
+
+        members_data = []
+        for m in members:
+            members_data.append({
+                "user_id": m.get("user_id"),
+                "mssv": m.get("mssv"),
+                "full_name": m.get("full_name", ""),
+                "is_leader": m.get("user_id") == leader_id
+            })
+
         teams.append(
             {
                 "id": group.get("_id", ""),
                 "name": group.get("name", ""),
                 "members_count": len(members),
-                "status": "Active",
+                "members": members_data,
+                "status": group.get("status", "Active"),
                 "created_at": _format_date(group.get("created_at")),
             }
         )
 
-    return templates.TemplateResponse("admin/teams.html", {"request": request, "teams": teams})
+    return templates.TemplateResponse("admin/teams.html", {
+        "request": request,
+        "teams": teams,
+        "is_moderation_enabled": is_moderation_enabled
+    })
 
 
 @app.get("/admin/rooms", response_class=HTMLResponse)
