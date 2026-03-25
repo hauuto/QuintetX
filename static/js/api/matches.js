@@ -23,6 +23,12 @@
             });
         },
 
+        async deleteMatch(matchId) {
+            return window.QXApi.request(`/api/v1/matches/${matchId}`, {
+                method: 'DELETE',
+            });
+        },
+
         async getMatchEvents(matchId, limit) {
             const capped = Math.max(1, Math.min(Number(limit || 100), 300));
             return window.QXApi.request(`/api/v1/matches/${matchId}/events?limit=${capped}`);
