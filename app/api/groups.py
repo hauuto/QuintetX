@@ -16,6 +16,7 @@ from app.db.init_db import (
     MATCHES_COLLECTION,
     NOTIFICATIONS_COLLECTION,
     USERS_COLLECTION,
+    SETTINGS_COLLECTION,
 )
 
 MAX_GROUP_MEMBERS = 6
@@ -114,6 +115,88 @@ class RenameGroupRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
 
 
+class ModerationToggleRequest(BaseModel):
+    enabled: bool
+
+
+@router.post("/moderation/toggle")
+async def toggle_group_moderation(
+    payload: ModerationToggleRequest,
+    current_user: dict[str, Any] = Depends(get_current_user),
+):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can toggle moderation")
+
+    database = get_database()
+
+    await database[SETTINGS_COLLECTION].update_one(
+        {"_id": "moderation"},
+        {"$set": {"group_moderation_enabled": payload.enabled}},
+        upsert=True
+    )
+
+    return {"status": "success", "data": {"enabled": payload.enabled}, "message": "Updated group moderation"}
+
+
+@router.post("/{group_id}/approve")
+async def admin_approve_group(
+    group_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can approve")
+    database = get_database()
+    group = await _find_group_or_404(group_id)
+    if group.get("status") != "Pending":
+        return {"status": "error", "data": {}, "message": "Nhóm không ở trạng thái chờ duyệt"}
+
+    await database[GROUPS_COLLECTION].update_one(
+        {"_id": group_id},
+        {"$set": {"status": "Active"}}
+    )
+    # Assign group to the leader actually
+    await database[USERS_COLLECTION].update_one(
+        {"_id": group.get("leader_id")},
+        {"$set": {"group_id": group_id}}
+    )
+
+    await _create_notification(
+        user_id=group.get("leader_id"),
+        sender_id=current_user.get("_id"),
+        notification_type="group_approved",
+        message=f"Yêu cầu tạo nhóm {group.get('name')} đã được admin duyệt.",
+        group_id=group_id,
+        status="sent",
+        link="/student/team",
+    )
+    return {"status": "success", "data": {}, "message": "Đã duyệt nhóm"}
+
+
+@router.post("/{group_id}/reject")
+async def admin_reject_group(
+    group_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can reject")
+    database = get_database()
+    group = await _find_group_or_404(group_id)
+    if group.get("status") != "Pending":
+        return {"status": "error", "data": {}, "message": "Nhóm không ở trạng thái chờ duyệt"}
+
+    await database[GROUPS_COLLECTION].delete_one({"_id": group_id})
+
+    await _create_notification(
+        user_id=group.get("leader_id"),
+        sender_id=current_user.get("_id"),
+        notification_type="group_rejected",
+        message=f"Yêu cầu tạo nhóm {group.get('name')} đã bị admin từ chối.",
+        group_id=None,
+        status="sent",
+    )
+    return {"status": "success", "data": {}, "message": "Đã từ chối nhóm"}
+
+
 @router.get("/open-missing")
 async def list_open_groups_missing_members(
     current_user: dict[str, Any] = Depends(get_current_user),
@@ -127,6 +210,7 @@ async def list_open_groups_missing_members(
     search_query = q.strip()
     base_filter: dict[str, Any] = {
         "is_public": True,
+        "status": {"$ne": "Pending"},
         "$expr": {"$lt": [{"$size": "$members"}, MAX_GROUP_MEMBERS]},
     }
     if search_query:
@@ -351,6 +435,15 @@ async def create_group(payload: CreateGroupRequest, current_user: dict[str, Any]
     if current_user.get("group_id"):
         return {"status": "error", "data": {}, "message": "User already has a group"}
 
+    # Check if user already has a pending group
+    pending_group = await database[GROUPS_COLLECTION].find_one({"leader_id": current_user.get("_id"), "status": "Pending"})
+    if pending_group:
+        return {"status": "error", "data": {}, "message": "Bạn đang có một yêu cầu tạo nhóm chờ duyệt"}
+
+    from app.db.init_db import SETTINGS_COLLECTION
+    settings_doc = await database[SETTINGS_COLLECTION].find_one({"_id": "moderation"})
+    is_moderation_enabled = settings_doc.get("group_moderation_enabled", False) if settings_doc else False
+
     group_id = _gen_group_id()
     group_code = _gen_group_code()
     now = _now_utc()
@@ -369,15 +462,18 @@ async def create_group(payload: CreateGroupRequest, current_user: dict[str, Any]
         "match_history": [],
         "stats": {"total": 0, "wins": 0, "losses": 0, "draws": 0},
         "created_at": now,
+        "status": "Pending" if is_moderation_enabled else "Active"
     }
 
     await database[GROUPS_COLLECTION].insert_one(group_doc)
-    await database[USERS_COLLECTION].update_one(
-        {"_id": current_user.get("_id")},
-        {"$set": {"group_id": group_id}},
-    )
 
-    return {"status": "success", "data": {"group": group_doc}, "message": ""}
+    if not is_moderation_enabled:
+        await database[USERS_COLLECTION].update_one(
+            {"_id": current_user.get("_id")},
+            {"$set": {"group_id": group_id}},
+        )
+
+    return {"status": "success", "data": {"group": group_doc}, "message": "Yêu cầu tạo nhóm đang chờ duyệt" if is_moderation_enabled else "Tạo nhóm thành công"}
 
 
 @router.post("/{group_id}/join")
@@ -391,7 +487,19 @@ async def request_join_group(
     if current_user.get("group_id"):
         return {"status": "error", "data": {}, "message": "User already has a group"}
 
+    from app.db.init_db import SETTINGS_COLLECTION
+    settings_doc = await database[SETTINGS_COLLECTION].find_one({"_id": "moderation"})
+    is_moderation_enabled = settings_doc.get("group_moderation_enabled", False) if settings_doc else False
+
+    if is_moderation_enabled:
+        # Instead of adding to group.pending_requests for leader to approve
+        # Or you can reject directly to keep it simple, since "đợi kiểm duyệt" could mean they can't join freely
+        return {"status": "error", "data": {}, "message": "Không thể xin vào nhóm khi chế độ kiểm duyệt đang bật. Liên hệ Admin!"}
+
     group = await _find_group_or_404(group_id)
+
+    if group.get("status") == "Pending":
+       return {"status": "error", "data": {}, "message": "Nhóm đang chờ admin duyệt, chưa thể tham gia"}
 
     if not group.get("is_public", False):
         return {
@@ -520,6 +628,11 @@ async def invite_user_to_group(
     group = await _find_group_or_404(group_id)
     await _ensure_group_leader(group, current_user)
 
+    from app.db.init_db import SETTINGS_COLLECTION
+    settings_doc = await database[SETTINGS_COLLECTION].find_one({"_id": "moderation"})
+    if settings_doc and settings_doc.get("group_moderation_enabled", False):
+        return {"status": "error", "data": {}, "message": "Không thể mời người khác khi chế độ kiểm duyệt đang bật."}
+
     if len(group.get("members", [])) >= MAX_GROUP_MEMBERS:
         return {"status": "error", "data": {}, "message": "Group is full"}
 
@@ -580,6 +693,12 @@ async def search_player_by_mssv(
 @router.post("/invites/{notification_id}/accept")
 async def accept_invite(notification_id: str, current_user: dict[str, Any] = Depends(get_current_user)):
     database = get_database()
+
+    from app.db.init_db import SETTINGS_COLLECTION
+    settings_doc = await database[SETTINGS_COLLECTION].find_one({"_id": "moderation"})
+    if settings_doc and settings_doc.get("group_moderation_enabled", False):
+        return {"status": "error", "data": {}, "message": "Không thể vào nhóm khi chế độ kiểm duyệt đang bật."}
+
     invite = await database[NOTIFICATIONS_COLLECTION].find_one(
         {
             "_id": notification_id,

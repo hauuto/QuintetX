@@ -17,6 +17,8 @@ USERS_COLLECTION = "users"
 GROUPS_COLLECTION = "groups"
 MATCHES_COLLECTION = "matches"
 NOTIFICATIONS_COLLECTION = "notifications"
+SETTINGS_COLLECTION = "settings"
+ADMIN_REQUESTS_COLLECTION = "admin_requests"
 
 SEED_ROOM_NAME = "Test"
 SEED_USER_MSSV_LIST = ["23012345", "23012346", "23012347"]
@@ -138,6 +140,10 @@ async def _ensure_collections(database: Any) -> None:
             NOTIFICATIONS_COLLECTION,
             validator=NOTIFICATIONS_SCHEMA_VALIDATOR,
         )
+    if SETTINGS_COLLECTION not in existing_collections:
+        await database.create_collection(SETTINGS_COLLECTION)
+    if ADMIN_REQUESTS_COLLECTION not in existing_collections:
+        await database.create_collection(ADMIN_REQUESTS_COLLECTION)
 
 
 async def _apply_collection_validators(database: Any) -> None:
