@@ -9,6 +9,12 @@
         <div class="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-6 shrink-0 z-10">
             <!-- Left: Live Status -->
             <div class="flex items-center space-x-4">
+                 <!-- Back Button -->
+                 <a href="/admin/rooms" class="inline-flex items-center text-sm font-semibold text-gray-500 hover:text-[#3547E5] transition-colors border-r border-gray-200 pr-4 mr-2">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    Quay lại
+                 </a>
+
                  <!-- Status Indicator -->
                  <div class="flex items-center space-x-2">
                     <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" :class="{'bg-green-500': isPlaying, 'bg-yellow-500': !isPlaying}"></span>
@@ -154,7 +160,7 @@
             </div>
             <div class="flex-1 bg-[#282c34] p-3 overflow-auto group relative">
                  <!-- Copy Button -->
-                <button class="absolute top-2 right-2 text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                <button @click="copyApiBody" class="absolute top-2 right-2 text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                 </button>
                 <div class="text-xs font-mono text-gray-300 leading-relaxed whitespace-pre" x-text="apiBody"></div>
@@ -191,6 +197,11 @@
                     },
                     timestamp: new Date().toISOString()
                 }, null, 2);
+            },
+
+            copyApiBody() {
+                const text = this.apiBody;
+                window.QXCopy(text, 'Đã sao chép API Body');
             },
 
             togglePlay() {

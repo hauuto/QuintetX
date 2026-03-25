@@ -379,21 +379,27 @@
             },
 
             copyToClipboard(text) {
-                if (!text) return;
-                navigator.clipboard.writeText(text).then(() => {
-                    alert('Đã sao chép!');
-                });
+                window.QXCopy(text, 'Đã sao chép!');
             },
 
             copyEnvTemplate() {
-                const env = `TEAM_X_ID=${this.createdMatch?.teams?.X?.team_id || ''}
-TEAM_X_API_KEY=${this.createdMatch?.teams?.X?.api_key || ''}
-TEAM_O_ID=${this.createdMatch?.teams?.O?.team_id || ''}
-TEAM_O_API_KEY=${this.createdMatch?.teams?.O?.api_key || ''}
-SERVER_URL=http://localhost:8000`;
-                navigator.clipboard.writeText(env).then(() => {
-                    alert('Đã sao chép Environment Variables!');
-                });
+                if (!this.createdMatch || !this.createdMatch.teams) return;
+                const m = this.createdMatch.teams;
+                const content = `TEAM_X_ID=${m.X?.team_id}\nTEAM_X_API_KEY=${m.X?.api_key}\nTEAM_O_ID=${m.O?.team_id}\nTEAM_O_API_KEY=${m.O?.api_key}\nSERVER_URL=${window.location.origin}`;
+                window.QXCopy(content, 'Đã sao chép thông tin phòng!');
+            },
+
+            copyTeamId(text) {
+                window.QXCopy(text, 'Đã sao chép Team ID');
+            },
+
+            copyEnvVars(match) {
+                if (!match || !match.teams || !match.teams.X || !match.teams.O) {
+                    if(window.QXToast) window.QXToast.show('Dữ liệu không hợp lệ', 'error');
+                    return;
+                }
+                const env = `X_TEAM_ID=${match.teams.X.team_id}\nX_API_KEY=${match.teams.X.api_key}\nO_TEAM_ID=${match.teams.O.team_id}\nO_API_KEY=${match.teams.O.api_key}`;
+                window.QXCopy(env, 'Đã sao chép Env Vars');
             }
         }
     }

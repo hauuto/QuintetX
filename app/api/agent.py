@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -67,10 +68,11 @@ def _build_event(
     }
 
 
-def _check_win(board: list[list[int]], x: int, y: int, value: int) -> bool:
+def _check_win(board: list[list[int]], x: int, y: int, value: int) -> list[tuple[int, int]] | None:
     directions = [(1, 0), (0, 1), (1, 1), (1, -1)]
 
     for dx, dy in directions:
+        line = [(x, y)]
         count = 1
 
         step = 1
@@ -81,6 +83,7 @@ def _check_win(board: list[list[int]], x: int, y: int, value: int) -> bool:
                 break
             if board[nx][ny] != value:
                 break
+            line.append((nx, ny))
             count += 1
             step += 1
 
@@ -92,13 +95,14 @@ def _check_win(board: list[list[int]], x: int, y: int, value: int) -> bool:
                 break
             if board[nx][ny] != value:
                 break
+            line.append((nx, ny))
             count += 1
             step += 1
 
         if count >= 5:
-            return True
+            return line
 
-    return False
+    return None
 
 
 async def _apply_turn_timeout_if_needed(match: dict[str, Any]) -> dict[str, Any]:
@@ -341,6 +345,8 @@ async def agent_heartbeat(session: dict[str, Any] = Depends(get_agent_session)):
 
 @router.post("/move")
 async def agent_move(payload: MoveRequest, session: dict[str, Any] = Depends(get_agent_session)):
+    await asyncio.sleep(0.2)
+
     database = get_database()
     side = session["side"]
     team_id = session["team_id"]
@@ -407,7 +413,8 @@ async def agent_move(payload: MoveRequest, session: dict[str, Any] = Depends(get
     updated = await database[MATCHES_COLLECTION].find_one({"_id": match_id})
     board = updated.get("board", [])
 
-    if _check_win(board, payload.x, payload.y, _side_value(side)):
+    winning_line = _check_win(board, payload.x, payload.y, _side_value(side))
+    if winning_line:
         await database[MATCHES_COLLECTION].update_one(
             {"_id": match_id, "status": "playing"},
             {
@@ -417,6 +424,7 @@ async def agent_move(payload: MoveRequest, session: dict[str, Any] = Depends(get
                     "finished_at": now,
                     "finish_reason": "win",
                     "turn_deadline_at": None,
+                    "winning_line": winning_line,
                 },
                 "$push": {
                     "events": {
@@ -426,6 +434,7 @@ async def agent_move(payload: MoveRequest, session: dict[str, Any] = Depends(get
                                 message=f"Đội {side} đã tạo 5 quân liên tiếp.",
                                 side=side,
                                 team_id=team_id,
+                                payload={"line": winning_line},
                             ),
                             _build_event(
                                 "match_finished",
