@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     APP_ENV: str = "dev"
     AUTO_SEED_ON_STARTUP: bool = True
 
+    # Server Settings
+    SERVER_HOST: str = "127.0.0.1"
+    SERVER_PORT: int = 8000
+
     # Game Settings
     BOARD_SIZE: int = 40
     TIME_PER_MOVE: float = 0.5
