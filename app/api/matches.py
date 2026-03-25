@@ -105,6 +105,7 @@ def _build_match_payload(
         "current_turn": match.get("current_turn"),
         "winner": match.get("winner"),
         "finish_reason": match.get("finish_reason"),
+        "winning_line": match.get("winning_line"),
         "start_time": _to_iso(match.get("start_time")),
         "started_at": _to_iso(match.get("started_at")),
         "finished_at": _to_iso(match.get("finished_at")),
@@ -407,10 +408,12 @@ async def get_my_match(current_user: dict[str, Any] = Depends(get_current_user))
         }
 
     my_match_query = {
-        "status": {"$in": ["waiting", "playing"]},
         "$or": [{"teams.X.team_id": group_id}, {"teams.O.team_id": group_id}],
     }
-    my_match = await database[MATCHES_COLLECTION].find_one(my_match_query)
+    my_match = await database[MATCHES_COLLECTION].find_one(
+        my_match_query,
+        sort=[("created_at", -1)]
+    )
 
     if my_match:
         team_ids = {

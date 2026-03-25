@@ -23,6 +23,15 @@
                     <div class="relative bg-white shadow-lg border border-gray-300 mx-auto"
                         :style="`width: ${boardPixelSize}px; height: ${boardPixelSize}px; background-size: ${cellSize}px ${cellSize}px; background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);`">
 
+                        <!-- Winning line highlight -->
+                        <template x-if="currentMatch.status === 'finished' && currentMatch.winning_line">
+                            <template x-for="pt in currentMatch.winning_line" :key="pt[0] + '-' + pt[1]">
+                                <div class="absolute bg-yellow-200 opacity-60"
+                                     :style="`left: ${pt[0] * cellSize}px; top: ${pt[1] * cellSize}px; width: ${cellSize}px; height: ${cellSize}px;`">
+                                </div>
+                            </template>
+                        </template>
+
                         <template x-for="move in currentMatch.history" :key="move.order">
                             <div class="absolute flex items-center justify-center"
                                 :style="`left: ${move.x * cellSize}px; top: ${move.y * cellSize}px; width: ${cellSize}px; height: ${cellSize}px;`">
@@ -121,19 +130,55 @@
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 shrink-0 flex items-center justify-between" x-data="{ copied: false }">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 shrink-0 flex items-center justify-between">
                     <div class="flex flex-col min-w-0 mr-3">
                         <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">API Key</h3>
                         <code class="text-xs font-mono text-gray-900 truncate" x-text="myTeam && myTeam.api_key ? myTeam.api_key : ''"></code>
                     </div>
                     <button
-                        @click="if (myTeam && myTeam.api_key) { navigator.clipboard.writeText(myTeam.api_key); copied = true; setTimeout(() => copied = false, 2000); }"
+                        @click="copyApiKey()"
                         class="bg-[#3547E5] hover:bg-blue-700 text-white text-[10px] font-bold px-3 py-1.5 rounded transition-colors shrink-0 uppercase tracking-wider"
-                        :class="copied ? 'bg-green-500 hover:bg-green-600' : ''"
+                        :class="apiKeyCopied ? 'bg-green-500 hover:bg-green-600' : ''"
                     >
-                        <span x-text="copied ? 'COPIED' : 'COPY'"></span>
+                        <span x-text="apiKeyCopied ? 'COPIED' : 'COPY'"></span>
                     </button>
                 </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Winner Popup -->
+    <template x-if="currentMatch.status === 'finished' && showingWinnerPopup">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" x-transition>
+            <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center border-t-4"
+                 :class="currentMatch.winner === myTeam?.side ? 'border-green-500' : (currentMatch.winner ? 'border-red-500' : 'border-gray-500')">
+                <div class="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4"
+                     :class="currentMatch.winner === myTeam?.side ? 'bg-green-100 text-green-600' : (currentMatch.winner ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600')">
+                    <template x-if="currentMatch.winner === myTeam?.side">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    </template>
+                    <template x-if="currentMatch.winner && currentMatch.winner !== myTeam?.side">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </template>
+                    <template x-if="!currentMatch.winner">
+                        <span class="font-bold text-xl">-</span>
+                    </template>
+                </div>
+
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">
+                    <span x-text="currentMatch.winner === 'X' ? currentMatch.teams.X.name : (currentMatch.winner === 'O' ? currentMatch.teams.O.name : 'Hòa')"></span>
+                </h2>
+                <p class="text-sm font-semibold text-gray-600 mb-1">
+                    <template x-if="currentMatch.winner">
+                        <span>Đội <span x-text="currentMatch.winner"></span> giành chiến thắng!</span>
+                    </template>
+                    <template x-if="!currentMatch.winner">
+                        <span>Trận đấu kết thúc với kết quả hòa.</span>
+                    </template>
+                </p>
+                <p class="text-xs text-gray-500 mb-6" x-text="'Lý do: ' + (currentMatch.finish_reason === 'win' ? 'Tạo 5 quân liên tiếp' : (currentMatch.finish_reason === 'timeout_forfeit' ? 'Đối thủ hết thời gian' : currentMatch.finish_reason))"></p>
+
+                <button @click="showingWinnerPopup = false" class="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-900 font-bold rounded-lg transition-colors text-sm uppercase">Đóng</button>
             </div>
         </div>
     </template>
@@ -208,6 +253,9 @@
             currentMatch: null,
             myTeam: null,
             pollTimerId: null,
+            showingWinnerPopup: false,
+            apiKeyCopied: false,
+            lastStatus: null,
             otherMatches: {
                 current_matches: [],
                 upcoming_matches: [],
@@ -228,7 +276,21 @@
                 }
                 this.pollTimerId = setInterval(() => {
                     this.loadMyMatch(false);
-                }, 1200);
+                }, 750);
+            },
+
+            copyApiKey() {
+                if (this.myTeam && this.myTeam.api_key) {
+                    const text = this.myTeam.api_key;
+                    window.QXCopy(text, 'Đã sao chép API Key');
+                    this.apiKeyCopied = true;
+                    setTimeout(() => this.apiKeyCopied = false, 2000);
+                }
+            },
+
+            copyApiBody() {
+                const text = this.apiBody;
+                window.QXCopy(text, 'Đã sao chép API Body');
             },
 
             async loadMyMatch(showLoading = true) {
@@ -240,6 +302,17 @@
                     const data = result.data || {};
                     this.currentMatch = data.my_current_match || null;
                     this.myTeam = data.my_team || null;
+
+                    if (this.currentMatch) {
+                        if (this.lastStatus && this.lastStatus !== 'finished' && this.currentMatch.status === 'finished') {
+                            this.showingWinnerPopup = true;
+                        }
+                        this.lastStatus = this.currentMatch.status;
+                    } else {
+                        this.lastStatus = null;
+                        this.showingWinnerPopup = false;
+                    }
+
                     this.otherMatches = data.other_matches || {
                         current_matches: [],
                         upcoming_matches: [],
