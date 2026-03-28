@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     # Game Settings
     BOARD_SIZE: int = 40
-    TIME_PER_MOVE: float = 0.75
+    TIME_PER_MOVE: float = 0.5
     MOVE_TIMEOUT_SECONDS: int = 10
 
     # Database Settings

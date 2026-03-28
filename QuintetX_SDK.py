@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 import threading
 import time
 from dataclasses import dataclass
@@ -32,6 +33,7 @@ class QuintetXClient:
         api_key: str,
         *,
         timeout_seconds: float = 5.0,
+        log: Callable[[str], None] | None = print,
     ) -> None:
         server_url = (server_url or "").strip().rstrip("/")
         team_id = (team_id or "").strip()
@@ -59,6 +61,8 @@ class QuintetXClient:
 
         self.side: Optional[str] = None
 
+        self._log_fn = log
+
         self._stop_heartbeat = threading.Event()
         self._heartbeat_thread: Optional[threading.Thread] = None
 
@@ -66,46 +70,167 @@ class QuintetXClient:
     # Low-level HTTP helpers
     # -------------------------
 
-    def _safe_json(self, resp: requests.Response) -> JsonDict:
+    def _log(self, message: str) -> None:
+        if not self._log_fn:
+            return
         try:
-            return resp.json()
+            self._log_fn(f"[QuintetX] {message}")
         except Exception:
-            text_head = (resp.text or "")[:500]
+            # Never crash user code because of logging.
+            pass
+
+    def _normalize_response(self, *, resp: requests.Response | None, exc: Exception | None) -> JsonDict:
+        if exc is not None:
             return {
                 "status": "error",
                 "data": {},
-                "message": f"Non-JSON response: HTTP {resp.status_code} | {text_head}",
+                "message": f"Network error: {exc}",
+                "http_status": None,
+                "error_type": "network",
             }
 
+        assert resp is not None
+        status_code = int(getattr(resp, "status_code", 0) or 0)
+
+        try:
+            payload = resp.json()
+        except Exception:
+            text_head = (resp.text or "")[:500]
+            return {
+                "status": "error" if not resp.ok else "success",
+                "data": {},
+                "message": f"Non-JSON response: HTTP {status_code} | {text_head}",
+                "http_status": status_code,
+                "error_type": "http" if not resp.ok else None,
+            }
+
+        # Normalize common FastAPI error shape: {"detail": "..."}
+        if isinstance(payload, dict) and "status" not in payload and "detail" in payload:
+            return {
+                "status": "error",
+                "data": {},
+                "message": str(payload.get("detail") or ""),
+                "http_status": status_code,
+                "error_type": "auth" if status_code in (401, 403) else "http",
+            }
+
+        # Ensure we always return the SDK's standard envelope.
+        if not isinstance(payload, dict) or "status" not in payload:
+            return {
+                "status": "success" if resp.ok else "error",
+                "data": payload if isinstance(payload, dict) else {"raw": payload},
+                "message": "" if resp.ok else f"HTTP {status_code}",
+                "http_status": status_code,
+                "error_type": None if resp.ok else ("auth" if status_code in (401, 403) else "http"),
+            }
+
+        # Add metadata without breaking the server's existing shape.
+        payload.setdefault("http_status", status_code)
+        if not resp.ok:
+            payload.setdefault("error_type", "auth" if status_code in (401, 403) else "http")
+            payload["status"] = "error"
+            if not payload.get("message"):
+                payload["message"] = f"HTTP {status_code}"
+            payload.setdefault("data", {})
+
+        return payload
+
+    def _request(self, method: str, path: str, *, json: JsonDict | None = None) -> JsonDict:
+        url = f"{self.base_url}{path}"
+        try:
+            resp = requests.request(
+                method=method,
+                url=url,
+                headers=self.headers,
+                json=json,
+                timeout=self.config.timeout_seconds,
+            )
+            return self._normalize_response(resp=resp, exc=None)
+        except Exception as exc:
+            return self._normalize_response(resp=None, exc=exc)
+
     def _get(self, path: str) -> JsonDict:
-        resp = requests.get(
-            f"{self.base_url}{path}",
-            headers=self.headers,
-            timeout=self.config.timeout_seconds,
-        )
-        return self._safe_json(resp)
+        return self._request("GET", path)
 
     def _post(self, path: str, *, json: JsonDict | None = None) -> JsonDict:
-        resp = requests.post(
-            f"{self.base_url}{path}",
-            headers=self.headers,
-            json=json,
-            timeout=self.config.timeout_seconds,
-        )
-        return self._safe_json(resp)
+        return self._request("POST", path, json=json)
 
     # -------------------------
     # Public API
     # -------------------------
 
+    def _is_auth_error(self, payload: JsonDict) -> bool:
+        http_status = payload.get("http_status")
+        if http_status in (401, 403):
+            return True
+        message = str(payload.get("message") or "")
+        return "Invalid agent credentials" in message or "Missing X-API-Key" in message
+
     def connect(self, *, start_heartbeat: bool = True, heartbeat_interval: float = 5.0) -> JsonDict:
-        """POST /init. Server sẽ trả về side (X/O) trong payload."""
+        """POST /init.
+
+        - Nếu đúng credential, server trả payload state, gồm `data.side` (X/O).
+        - Nếu sai credential, server trả HTTP 401 (FastAPI error shape).
+        """
         payload = self._post("/init")
         if payload.get("status") == "success":
             self.side = (payload.get("data") or {}).get("side")
+            self._log(f"Connected. side={self.side}")
             if start_heartbeat:
                 self.start_heartbeat(interval_seconds=heartbeat_interval)
+        else:
+            if self._is_auth_error(payload):
+                self._log("Auth failed (team_id/api_key).")
+            else:
+                self._log(f"Connect failed: {payload.get('message')}")
         return payload
+
+    def connect_with_retry(
+        self,
+        *,
+        start_heartbeat: bool = True,
+        heartbeat_interval_seconds: float = 5.0,
+        retry_initial_delay_seconds: float = 1.0,
+        retry_max_delay_seconds: float = 10.0,
+        retry_jitter_seconds: float = 0.2,
+        max_attempts: int | None = None,
+    ) -> JsonDict:
+        """Reconnect /init cho đến khi thành công.
+
+        - Nếu sai team_id/api_key: báo lỗi và dừng (không retry vô hạn).
+        - Nếu lỗi mạng/server: retry với backoff.
+        """
+        attempt = 0
+        delay = max(0.2, float(retry_initial_delay_seconds))
+        max_delay = max(delay, float(retry_max_delay_seconds))
+        jitter = max(0.0, float(retry_jitter_seconds))
+
+        while True:
+            attempt += 1
+            if attempt == 1:
+                self._log("Connecting...")
+            else:
+                self._log(f"Reconnecting... attempt={attempt}")
+
+            payload = self.connect(start_heartbeat=False)
+            if payload.get("status") == "success":
+                if start_heartbeat:
+                    self.start_heartbeat(interval_seconds=heartbeat_interval_seconds)
+                return payload
+
+            if self._is_auth_error(payload):
+                # Wrong credentials should be surfaced immediately.
+                return payload
+
+            if max_attempts is not None and attempt >= int(max_attempts):
+                return payload
+
+            sleep_s = min(max_delay, delay)
+            if jitter:
+                sleep_s += random.uniform(0.0, jitter)
+            self._log(f"Retry in {sleep_s:.1f}s: {payload.get('message')}")
+            time.sleep(sleep_s)
+            delay = min(max_delay, delay * 1.5)
 
     def get_state(self) -> JsonDict:
         """GET /state."""
@@ -158,12 +283,14 @@ class QuintetXClient:
         - Dừng khi match finished, hoặc khi đạt max_steps (nếu set).
         """
         if connect_first:
-            init = self.connect(
+            init = self.connect_with_retry(
                 start_heartbeat=start_heartbeat,
-                heartbeat_interval=heartbeat_interval_seconds,
+                heartbeat_interval_seconds=heartbeat_interval_seconds,
             )
             if init.get("status") != "success":
-                raise RuntimeError(init.get("message") or "Cannot connect")
+                message = init.get("message") or f"Cannot connect: {init}"
+                # If wrong credential, fail fast so user can fix config.
+                raise RuntimeError(str(message))
 
         sleep_s = max(0.05, float(poll_interval_seconds))
         steps = 0
@@ -177,6 +304,8 @@ class QuintetXClient:
                 steps += 1
 
                 if state.get("status") != "success":
+                    if self._is_auth_error(state):
+                        raise RuntimeError(str(state.get("message") or "Invalid agent credentials"))
                     time.sleep(sleep_s)
                     continue
 
@@ -211,12 +340,13 @@ class QuintetXClient:
     ) -> None:
         """Phiên bản nâng cao: strategy nhận nguyên state_data (bao gồm board/turn/events...)."""
         if connect_first:
-            init = self.connect(
+            init = self.connect_with_retry(
                 start_heartbeat=start_heartbeat,
-                heartbeat_interval=heartbeat_interval_seconds,
+                heartbeat_interval_seconds=heartbeat_interval_seconds,
             )
             if init.get("status") != "success":
-                raise RuntimeError(init.get("message") or "Cannot connect")
+                message = init.get("message") or f"Cannot connect: {init}"
+                raise RuntimeError(str(message))
 
         sleep_s = max(0.05, float(poll_interval_seconds))
         steps = 0
@@ -229,6 +359,8 @@ class QuintetXClient:
                 steps += 1
 
                 if state.get("status") != "success":
+                    if self._is_auth_error(state):
+                        raise RuntimeError(str(state.get("message") or "Invalid agent credentials"))
                     time.sleep(sleep_s)
                     continue
 

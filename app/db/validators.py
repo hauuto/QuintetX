@@ -219,15 +219,6 @@ MATCHES_SCHEMA_VALIDATOR = {
             "finished_at": {"bsonType": ["date", "null"]},
             "turn_deadline_at": {"bsonType": ["date", "null"]},
             "finish_reason": {"bsonType": ["string", "null"]},
-            "winning_line": {
-                "bsonType": ["array", "null"],
-                "items": {
-                    "bsonType": "array",
-                    "minItems": 2,
-                    "maxItems": 2,
-                    "items": {"bsonType": "int"},
-                },
-            },
             "created_at": {"bsonType": "date"},
         },
         "additionalProperties": False,

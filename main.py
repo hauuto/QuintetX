@@ -2,9 +2,11 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
 from app.api.auth import router as auth_router
 from app.api.agent import router as agent_router
 from app.api.groups import router as groups_router
@@ -45,6 +47,32 @@ app = FastAPI(
     debug=settings.DEBUG,
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_: Request, exc: HTTPException):
+    message = exc.detail if isinstance(exc.detail, str) else "Request failed"
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"status": "error", "data": {}, "message": message},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(_: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"status": "error", "data": {"errors": exc.errors()}, "message": "Validation error"},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(_: Request, exc: Exception):
+    message = str(exc) if settings.DEBUG else "Internal server error"
+    return JSONResponse(
+        status_code=500,
+        content={"status": "error", "data": {}, "message": message},
+    )
 
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -151,20 +179,13 @@ async def admin_dashboard(request: Request):
 # Placeholder routes for sidebar links
 @app.get("/admin/teams", response_class=HTMLResponse)
 async def admin_teams(request: Request):
-    from app.db.init_db import SETTINGS_COLLECTION
     database = get_database()
-
-    settings_doc = await database[SETTINGS_COLLECTION].find_one({"_id": "moderation"})
-    is_moderation_enabled = settings_doc.get("group_moderation_enabled", False) if settings_doc else False
-
     groups = await database[GROUPS_COLLECTION].find(
         {},
         {
             "_id": 1,
             "name": 1,
             "members": 1,
-            "leader_id": 1,
-            "status": 1,
             "created_at": 1,
         },
     ).sort("created_at", -1).to_list(length=500)
@@ -172,33 +193,17 @@ async def admin_teams(request: Request):
     teams = []
     for group in groups:
         members = group.get("members") or []
-        leader_id = group.get("leader_id")
-
-        members_data = []
-        for m in members:
-            members_data.append({
-                "user_id": m.get("user_id"),
-                "mssv": m.get("mssv"),
-                "full_name": m.get("full_name", ""),
-                "is_leader": m.get("user_id") == leader_id
-            })
-
         teams.append(
             {
                 "id": group.get("_id", ""),
                 "name": group.get("name", ""),
                 "members_count": len(members),
-                "members": members_data,
-                "status": group.get("status", "Active"),
+                "status": "Active",
                 "created_at": _format_date(group.get("created_at")),
             }
         )
 
-    return templates.TemplateResponse("admin/teams.html", {
-        "request": request,
-        "teams": teams,
-        "is_moderation_enabled": is_moderation_enabled
-    })
+    return templates.TemplateResponse("admin/teams.html", {"request": request, "teams": teams})
 
 
 @app.get("/admin/rooms", response_class=HTMLResponse)

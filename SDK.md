@@ -49,6 +49,10 @@ init = client.connect()
 print("init:", init)
 print("side:", client.side)  # "X" hoặc "O"
 
+# Gợi ý: Nếu bạn muốn SDK tự reconnect đến khi /init thành công
+# (chỉ retry khi lỗi mạng/server; sai team_id/api_key sẽ báo lỗi và dừng)
+# init = client.connect_with_retry()
+
 state = client.get_state()
 print("state:", state)
 
@@ -90,14 +94,15 @@ python sdk_example_agent.py --server-url http://127.0.0.1:8000 --team-id T0001pa
 ```
 
 `run()` sẽ:
-- `connect()` (mặc định)
+- `connect_with_retry()` (mặc định) — tự reconnect cho đến khi init thành công
 - poll `GET /api/v1/agent/state`
 - chỉ gửi move khi `match_status == "playing"` và tới lượt agent
 - dừng khi match `finished`
 
 ## API của SDK
 
-- `connect()` → `POST /api/v1/agent/init`
+- `connect()` → `POST /api/v1/agent/init` (1 lần)
+- `connect_with_retry()` → reconnect /init cho đến khi thành công (fail-fast nếu sai credential)
 - `get_state()` → `GET /api/v1/agent/state`
 - `send_move(x, y)` → `POST /api/v1/agent/move`
 - `heartbeat_once()` → `POST /api/v1/agent/heartbeat`

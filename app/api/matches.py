@@ -105,7 +105,6 @@ def _build_match_payload(
         "current_turn": match.get("current_turn"),
         "winner": match.get("winner"),
         "finish_reason": match.get("finish_reason"),
-        "winning_line": match.get("winning_line"),
         "start_time": _to_iso(match.get("start_time")),
         "started_at": _to_iso(match.get("started_at")),
         "finished_at": _to_iso(match.get("finished_at")),
@@ -314,23 +313,6 @@ async def create_match(payload: CreateMatchRequest, current_user: dict[str, Any]
     }
 
 
-@router.delete("/{match_id}")
-async def delete_match(match_id: str, current_user: dict[str, Any] = Depends(get_current_user)):
-    if not _ensure_admin(current_user):
-        return {"status": "error", "data": {}, "message": "Only admin can delete matches"}
-
-    database = get_database()
-    result = await database[MATCHES_COLLECTION].delete_one({"_id": match_id})
-    if result.deleted_count == 0:
-        return {"status": "error", "data": {}, "message": "Match not found"}
-
-    return {
-        "status": "success",
-        "data": {},
-        "message": "Match deleted successfully",
-    }
-
-
 @router.get("/overview")
 async def list_matches_overview(current_user: dict[str, Any] = Depends(get_current_user)):
     del current_user
@@ -408,12 +390,10 @@ async def get_my_match(current_user: dict[str, Any] = Depends(get_current_user))
         }
 
     my_match_query = {
+        "status": {"$in": ["waiting", "playing"]},
         "$or": [{"teams.X.team_id": group_id}, {"teams.O.team_id": group_id}],
     }
-    my_match = await database[MATCHES_COLLECTION].find_one(
-        my_match_query,
-        sort=[("created_at", -1)]
-    )
+    my_match = await database[MATCHES_COLLECTION].find_one(my_match_query)
 
     if my_match:
         team_ids = {
