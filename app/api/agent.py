@@ -127,7 +127,9 @@ async def _apply_turn_timeout_if_needed(match: dict[str, Any]) -> dict[str, Any]
                 "finished_at": now,
                 "finish_reason": "timeout_forfeit",
                 "turn_deadline_at": None,
+                "updated_at": now,
             },
+            "$inc": {"rev": 1},
             "$push": {
                 "events": {
                     "$each": [
@@ -213,7 +215,9 @@ async def agent_init(session: dict[str, Any] = Depends(get_agent_session)):
             "$set": {
                 f"teams.{side}.is_connected": True,
                 f"teams.{side}.last_heartbeat": now,
+                "updated_at": now,
             },
+            "$inc": {"rev": 1},
             "$push": {
                 "events": _build_event(
                     "agent_ready",
@@ -242,7 +246,9 @@ async def agent_init(session: dict[str, Any] = Depends(get_agent_session)):
                     "current_turn": "X",
                     "started_at": now,
                     "turn_deadline_at": now + timedelta(seconds=settings.MOVE_TIMEOUT_SECONDS),
+                    "updated_at": now,
                 },
+                "$inc": {"rev": 1},
                 "$push": {
                     "events": _build_event(
                         "match_started",
@@ -287,6 +293,12 @@ async def agent_init(session: dict[str, Any] = Depends(get_agent_session)):
             if bootstrap_events:
                 update_doc["$push"] = {"events": {"$each": bootstrap_events}}
 
+            # Any bootstrap write is also a state change that viewers should refresh.
+            update_doc.setdefault("$inc", {})
+            update_doc["$inc"]["rev"] = 1
+            update_doc.setdefault("$set", {})
+            update_doc["$set"]["updated_at"] = now
+
             await database[MATCHES_COLLECTION].update_one(
                 {"_id": match.get("_id"), "status": "playing"},
                 update_doc,
@@ -328,6 +340,7 @@ async def agent_heartbeat(session: dict[str, Any] = Depends(get_agent_session)):
             "$set": {
                 f"teams.{side}.last_heartbeat": now,
                 f"teams.{side}.is_connected": True,
+                "updated_at": now,
             }
         },
     )
@@ -387,7 +400,9 @@ async def agent_move(payload: MoveRequest, session: dict[str, Any] = Depends(get
                 board_cell_path: _side_value(side),
                 f"teams.{side}.last_heartbeat": now,
                 f"teams.{side}.is_connected": True,
+                "updated_at": now,
             },
+            "$inc": {"rev": 1},
             "$push": {
                 "history": {"x": payload.x, "y": payload.y, "p": side, "t": now},
                 "events": _build_event(
@@ -417,7 +432,9 @@ async def agent_move(payload: MoveRequest, session: dict[str, Any] = Depends(get
                     "finished_at": now,
                     "finish_reason": "win",
                     "turn_deadline_at": None,
+                    "updated_at": now,
                 },
+                "$inc": {"rev": 1},
                 "$push": {
                     "events": {
                         "$each": [
@@ -447,7 +464,9 @@ async def agent_move(payload: MoveRequest, session: dict[str, Any] = Depends(get
                 "$set": {
                     "current_turn": next_side,
                     "turn_deadline_at": now + timedelta(seconds=settings.MOVE_TIMEOUT_SECONDS),
+                    "updated_at": now,
                 },
+                "$inc": {"rev": 1},
                 "$push": {
                     "events": _build_event(
                         "turn_changed",

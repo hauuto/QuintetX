@@ -11,6 +11,10 @@
         notificationsOpen: false,
         notifications: [],
         unreadCount: 0,
+        notificationsTimerId: null,
+        notificationsInFlight: false,
+        notificationsStopped: false,
+        notificationsVisibilityListenerAdded: false,
         async loadNotifications() {
             try {
                 const result = await window.QXApi.groups.getMyNotifications(false);
@@ -115,9 +119,57 @@
             } catch (error) {
                 // Keep default profile when localStorage is not available.
             }
+        },
+        startNotificationsPolling() {
+            this.notificationsStopped = false;
+            if (this.notificationsTimerId) {
+                clearTimeout(this.notificationsTimerId);
+            }
+
+            if (!this.notificationsVisibilityListenerAdded) {
+                this.notificationsVisibilityListenerAdded = true;
+                document.addEventListener('visibilitychange', () => {
+                    if (!document.hidden) {
+                        this.loadNotifications();
+                    }
+                }, { passive: true });
+            }
+
+            const intervalMs = 10000;
+            const loop = async () => {
+                if (this.notificationsStopped) return;
+
+                if (document.hidden) {
+                    this.notificationsTimerId = setTimeout(loop, intervalMs);
+                    return;
+                }
+
+                if (this.notificationsInFlight) {
+                    this.notificationsTimerId = setTimeout(loop, intervalMs);
+                    return;
+                }
+
+                this.notificationsInFlight = true;
+                try {
+                    await this.loadNotifications();
+                } finally {
+                    this.notificationsInFlight = false;
+                }
+
+                this.notificationsTimerId = setTimeout(loop, intervalMs);
+            };
+
+            loop();
+        },
+        stopNotificationsPolling() {
+            this.notificationsStopped = true;
+            if (this.notificationsTimerId) {
+                clearTimeout(this.notificationsTimerId);
+                this.notificationsTimerId = null;
+            }
         }
     }"
-    x-init="initProfile(); loadNotifications(); setInterval(() => loadNotifications(), 10000)"
+    x-init="initProfile(); startNotificationsPolling()"
 >
 
     <!-- Sidebar -->

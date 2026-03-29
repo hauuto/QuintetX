@@ -142,6 +142,8 @@ MATCHES_SCHEMA_VALIDATOR = {
             "_id": {"bsonType": "string", "pattern": REGEX_MATCH_ID},
             "room_name": {"bsonType": "string", "minLength": 1},
             "status": {"enum": ["waiting", "playing", "finished"]},
+            "rev": {"bsonType": "int", "minimum": 0},
+            "updated_at": {"bsonType": ["date", "null"]},
             "board": {
                 "bsonType": "array",
                 "minItems": 40,

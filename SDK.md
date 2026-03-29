@@ -20,9 +20,39 @@ pip install requests
 
 Chỉ cần copy file `QuintetX_SDK.py` vào project của bạn.
 
-## Thông tin cần có
+## Cách chạy (khuyến nghị) — Login + Multi-solution
 
-Bạn cần 3 giá trị từ Admin/match:
+Không cần nhập `team_id` và `api_key` nữa.
+
+1) Chạy runner:
+
+```bash
+python sdk_run.py --server-url http://127.0.0.1:8000
+```
+
+2) SDK sẽ hiện danh sách solution trong thư mục `solutions/` để bạn chọn.
+
+3) Lần chạy đầu tiên sẽ hỏi:
+- MSSV
+- Password
+
+Sau khi login, SDK lưu session vào file `.quintetx_session.json` (cùng thư mục với `sdk_run.py`). Lần sau chỉ cần chạy lại `sdk_run.py` là đủ.
+
+## Template có giao diện (GUI)
+
+SDK có sẵn template GUI chạy local (Tkinter, không cần cài thêm thư viện):
+
+```bash
+python sdk_gui.py --server-url http://127.0.0.1:8000
+```
+
+GUI hỗ trợ: login/load session, chọn solution trong `solutions/`, Start/Stop, xem log.
+
+> Lưu ý: SDK sẽ gọi `GET /api/v1/matches/me` để lấy `team_id/api_key` của nhóm bạn trong match đang `waiting/playing`. Nếu nhóm chưa có match active thì SDK sẽ báo lỗi.
+
+## Thông tin cần có (legacy)
+
+Nếu bạn vẫn muốn chạy theo cách cũ, bạn cần 3 giá trị từ Admin/match:
 
 - `server_url` (ví dụ `http://127.0.0.1:8000`)
 - `team_id` (ví dụ `T0001padjsl92`)
@@ -52,6 +82,9 @@ print("side:", client.side)  # "X" hoặc "O"
 # Gợi ý: Nếu bạn muốn SDK tự reconnect đến khi /init thành công
 # (chỉ retry khi lỗi mạng/server; sai team_id/api_key sẽ báo lỗi và dừng)
 # init = client.connect_with_retry()
+
+# Gợi ý: Nếu bạn muốn SDK tự login + tự lấy team_id/api_key (không nhập tay)
+# client = QuintetXClient.from_student_login(server_url="http://127.0.0.1:8000")
 
 state = client.get_state()
 print("state:", state)
@@ -86,6 +119,8 @@ client.run(next_move)
 ## File mẫu
 
 Repo có file mẫu `sdk_example_agent.py`.
+
+Luồng login + multi-solution: chạy `sdk_run.py` và tạo các solution trong `solutions/`.
 
 Chạy:
 

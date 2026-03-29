@@ -19,6 +19,12 @@ ACTIVE_MATCH_STATUSES = ["waiting", "playing"]
 DEFAULT_API_KEY_LENGTH = 32
 
 
+def _ensure_can_view_match(_: dict[str, Any], __: dict[str, Any]) -> bool:
+    # Match viewing is read-only and safe (API keys are never returned in payload).
+    # Allow any authenticated user to view matches for now.
+    return True
+
+
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -91,6 +97,8 @@ def _build_match_payload(
     group_name_map: dict[str, str],
     *,
     include_board: bool,
+    include_history: bool = True,
+    include_events: bool = True,
 ) -> dict[str, Any]:
     teams = match.get("teams", {})
     team_x = teams.get("X", {})
@@ -105,6 +113,7 @@ def _build_match_payload(
         "current_turn": match.get("current_turn"),
         "winner": match.get("winner"),
         "finish_reason": match.get("finish_reason"),
+        "rev": int(match.get("rev") or 0),
         "start_time": _to_iso(match.get("start_time")),
         "started_at": _to_iso(match.get("started_at")),
         "finished_at": _to_iso(match.get("finished_at")),
@@ -124,8 +133,15 @@ def _build_match_payload(
                 "last_heartbeat": _to_iso(team_o.get("last_heartbeat")),
             },
         },
-        "history": _normalize_history(match.get("history", [])),
-        "events": [
+    }
+
+    if include_history:
+        payload["history"] = _normalize_history(match.get("history", []))
+    else:
+        payload["history"] = []
+
+    if include_events:
+        payload["events"] = [
             {
                 "type": item.get("type"),
                 "message": item.get("message"),
@@ -135,8 +151,9 @@ def _build_match_payload(
                 "created_at": _to_iso(item.get("created_at")),
             }
             for item in match.get("events", [])[-100:]
-        ],
-    }
+        ]
+    else:
+        payload["events"] = []
 
     if include_board:
         payload["board"] = match.get("board", _create_board())
@@ -256,6 +273,8 @@ async def create_match(payload: CreateMatchRequest, current_user: dict[str, Any]
         "_id": match_id,
         "room_name": room_name,
         "status": match_status,
+        "rev": 0,
+        "updated_at": now,
         "board": _create_board(),
         "teams": {
             "X": {
@@ -302,6 +321,8 @@ async def create_match(payload: CreateMatchRequest, current_user: dict[str, Any]
         match_doc,
         team_name_map,
         include_board=False,
+        include_history=False,
+        include_events=False,
     )
     created_payload["teams"]["X"]["api_key"] = x_api_key
     created_payload["teams"]["O"]["api_key"] = o_api_key
@@ -328,9 +349,8 @@ async def list_matches_overview(current_user: dict[str, Any] = Depends(get_curre
             "winner": 1,
             "start_time": 1,
             "created_at": 1,
+            "rev": 1,
             "teams": 1,
-            "history": 1,
-            "events": 1,
             "started_at": 1,
             "finished_at": 1,
             "turn_deadline_at": 1,
@@ -352,7 +372,7 @@ async def list_matches_overview(current_user: dict[str, Any] = Depends(get_curre
     finished_matches: list[dict[str, Any]] = []
 
     for match in matches:
-        item = _build_match_payload(match, group_name_map, include_board=False)
+        item = _build_match_payload(match, group_name_map, include_board=False, include_history=False, include_events=False)
         status = item.get("status")
         if status == "playing":
             current_matches.append(item)
@@ -390,10 +410,13 @@ async def get_my_match(current_user: dict[str, Any] = Depends(get_current_user))
         }
 
     my_match_query = {
-        "status": {"$in": ["waiting", "playing"]},
+        "status": {"$in": ["waiting", "playing", "finished"]},
         "$or": [{"teams.X.team_id": group_id}, {"teams.O.team_id": group_id}],
     }
-    my_match = await database[MATCHES_COLLECTION].find_one(my_match_query)
+    my_match = await database[MATCHES_COLLECTION].find_one(
+        my_match_query,
+        sort=[("created_at", -1)],
+    )
 
     if my_match:
         team_ids = {
@@ -413,7 +436,7 @@ async def get_my_match(current_user: dict[str, Any] = Depends(get_current_user))
         return {
             "status": "success",
             "data": {
-                "my_current_match": _build_match_payload(my_match, group_name_map, include_board=True),
+                "my_current_match": _build_match_payload(my_match, group_name_map, include_board=True, include_history=True, include_events=True),
                 "my_team": my_team,
                 "other_matches": {
                     "current_matches": [],
@@ -439,9 +462,8 @@ async def get_my_match(current_user: dict[str, Any] = Depends(get_current_user))
             "winner": 1,
             "start_time": 1,
             "created_at": 1,
+            "rev": 1,
             "teams": 1,
-            "history": 1,
-            "events": 1,
             "started_at": 1,
             "finished_at": 1,
             "turn_deadline_at": 1,
@@ -462,7 +484,7 @@ async def get_my_match(current_user: dict[str, Any] = Depends(get_current_user))
     upcoming_matches: list[dict[str, Any]] = []
     finished_matches: list[dict[str, Any]] = []
     for match in all_matches:
-        item = _build_match_payload(match, group_name_map, include_board=False)
+        item = _build_match_payload(match, group_name_map, include_board=False, include_history=False, include_events=False)
         status = item.get("status")
         if status == "playing":
             current_matches.append(item)
@@ -481,6 +503,122 @@ async def get_my_match(current_user: dict[str, Any] = Depends(get_current_user))
                 "upcoming_matches": upcoming_matches,
                 "finished_matches": finished_matches,
             },
+        },
+        "message": "",
+    }
+
+
+@router.get("/me/summary")
+async def get_my_match_summary(
+    current_user: dict[str, Any] = Depends(get_current_user),
+    since_rev: int | None = None,
+):
+    database = get_database()
+    group_id = current_user.get("group_id")
+
+    if not group_id:
+        overview = await list_matches_overview(current_user)
+        return {
+            "status": "success",
+            "data": {
+                "my_current_match": None,
+                "my_team": None,
+                "other_matches": overview.get("data", {}),
+                "rev_changed": False,
+            },
+            "message": "",
+        }
+
+    my_match_query = {
+        "status": {"$in": ["waiting", "playing", "finished"]},
+        "$or": [{"teams.X.team_id": group_id}, {"teams.O.team_id": group_id}],
+    }
+
+    projection = {
+        "_id": 1,
+        "room_name": 1,
+        "status": 1,
+        "current_turn": 1,
+        "winner": 1,
+        "finish_reason": 1,
+        "started_at": 1,
+        "finished_at": 1,
+        "turn_deadline_at": 1,
+        "created_at": 1,
+        "rev": 1,
+        "teams": 1,
+    }
+
+    my_match = await database[MATCHES_COLLECTION].find_one(
+        my_match_query,
+        projection,
+        sort=[("created_at", -1)],
+    )
+
+    if not my_match:
+        return {
+            "status": "success",
+            "data": {
+                "my_current_match": None,
+                "my_team": {"id": group_id},
+                "other_matches": {
+                    "current_matches": [],
+                    "upcoming_matches": [],
+                    "finished_matches": [],
+                },
+                "rev_changed": False,
+            },
+            "message": "",
+        }
+
+    teams = my_match.get("teams", {})
+    my_side = "X" if teams.get("X", {}).get("team_id") == group_id else "O"
+
+    rev_value = int(my_match.get("rev") or 0)
+    rev_changed = True
+    if since_rev is not None:
+        try:
+            rev_changed = int(since_rev) != rev_value
+        except Exception:
+            rev_changed = True
+
+    summary_match = {
+        "id": my_match.get("_id"),
+        "room_name": my_match.get("room_name"),
+        "status": my_match.get("status"),
+        "current_turn": my_match.get("current_turn"),
+        "winner": my_match.get("winner"),
+        "finish_reason": my_match.get("finish_reason"),
+        "started_at": _to_iso(my_match.get("started_at")),
+        "finished_at": _to_iso(my_match.get("finished_at")),
+        "turn_deadline_at": _to_iso(my_match.get("turn_deadline_at")),
+        "created_at": _to_iso(my_match.get("created_at")),
+        "rev": rev_value,
+        "teams": {
+            "X": {
+                "team_id": teams.get("X", {}).get("team_id"),
+                "is_connected": bool(teams.get("X", {}).get("is_connected", False)),
+                "last_heartbeat": _to_iso(teams.get("X", {}).get("last_heartbeat")),
+            },
+            "O": {
+                "team_id": teams.get("O", {}).get("team_id"),
+                "is_connected": bool(teams.get("O", {}).get("is_connected", False)),
+                "last_heartbeat": _to_iso(teams.get("O", {}).get("last_heartbeat")),
+            },
+        },
+    }
+
+    return {
+        "status": "success",
+        "data": {
+            "my_current_match": summary_match,
+            "my_team": {"id": group_id, "side": my_side},
+            "other_matches": {
+                "current_matches": [],
+                "upcoming_matches": [],
+                "finished_matches": [],
+            },
+            "rev_changed": rev_changed,
         },
         "message": "",
     }
@@ -515,5 +653,120 @@ async def get_match_events(
     return {
         "status": "success",
         "data": {"events": events},
+        "message": "",
+    }
+
+
+@router.get("/my/history")
+async def list_my_finished_matches(
+    current_user: dict[str, Any] = Depends(get_current_user),
+    limit: int = 50,
+):
+    database = get_database()
+    group_id = current_user.get("group_id")
+    capped = max(1, min(int(limit or 50), 200))
+
+    if not group_id:
+        return {"status": "success", "data": {"matches": []}, "message": ""}
+
+    pipeline = [
+        {
+            "$match": {
+                "status": "finished",
+                "$or": [
+                    {"teams.X.team_id": group_id},
+                    {"teams.O.team_id": group_id},
+                ],
+            }
+        },
+        {"$sort": {"finished_at": -1, "created_at": -1}},
+        {
+            "$project": {
+                "_id": 1,
+                "room_name": 1,
+                "status": 1,
+                "winner": 1,
+                "finish_reason": 1,
+                "start_time": 1,
+                "started_at": 1,
+                "finished_at": 1,
+                "created_at": 1,
+                "teams": 1,
+                "rev": 1,
+                "move_count": {"$size": {"$ifNull": ["$history", []]}},
+            }
+        },
+        {"$limit": capped},
+    ]
+
+    raw = await database[MATCHES_COLLECTION].aggregate(pipeline).to_list(length=capped)
+
+    team_ids: set[str] = set()
+    for match in raw:
+        teams = match.get("teams", {})
+        team_ids.add(teams.get("X", {}).get("team_id", ""))
+        team_ids.add(teams.get("O", {}).get("team_id", ""))
+    team_ids.discard("")
+    group_name_map = await _load_group_name_map(team_ids)
+
+    matches: list[dict[str, Any]] = []
+    for match in raw:
+        teams = match.get("teams", {})
+        x_id = teams.get("X", {}).get("team_id")
+        o_id = teams.get("O", {}).get("team_id")
+
+        matches.append(
+            {
+                "id": match.get("_id"),
+                "room_name": match.get("room_name"),
+                "status": match.get("status"),
+                "winner": match.get("winner"),
+                "finish_reason": match.get("finish_reason"),
+                "start_time": _to_iso(match.get("start_time")),
+                "started_at": _to_iso(match.get("started_at")),
+                "finished_at": _to_iso(match.get("finished_at")),
+                "created_at": _to_iso(match.get("created_at")),
+                "rev": int(match.get("rev") or 0),
+                "move_count": int(match.get("move_count") or 0),
+                "teams": {
+                    "X": {
+                        "team_id": x_id,
+                        "name": group_name_map.get(x_id, x_id),
+                    },
+                    "O": {
+                        "team_id": o_id,
+                        "name": group_name_map.get(o_id, o_id),
+                    },
+                },
+                "my_side": "X" if x_id == group_id else "O",
+            }
+        )
+
+    return {"status": "success", "data": {"matches": matches}, "message": ""}
+
+
+@router.get("/{match_id}")
+async def get_match_by_id(match_id: str, current_user: dict[str, Any] = Depends(get_current_user)):
+    database = get_database()
+    match = await database[MATCHES_COLLECTION].find_one({"_id": match_id})
+    if not match:
+        return {"status": "error", "data": {}, "message": "Match not found"}
+
+    if not _ensure_can_view_match(current_user, match):
+        return {"status": "error", "data": {}, "message": "Forbidden"}
+
+    teams = match.get("teams", {})
+    team_ids = {
+        teams.get("X", {}).get("team_id", ""),
+        teams.get("O", {}).get("team_id", ""),
+    }
+    team_ids.discard("")
+    group_name_map = await _load_group_name_map(team_ids)
+
+    return {
+        "status": "success",
+        "data": {
+            "match": _build_match_payload(match, group_name_map, include_board=True, include_history=True, include_events=True),
+        },
         "message": "",
     }

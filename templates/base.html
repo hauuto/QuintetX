@@ -15,6 +15,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- Shared Config -->
+    <script>
+        window.QX_RUNTIME = {
+            MATCH_STEP_DELAY_MS: {{ QX_MATCH_STEP_DELAY_MS }},
+            MOVE_TIMEOUT_SECONDS: {{ QX_MOVE_TIMEOUT_SECONDS }},
+        };
+    </script>
     <script src="/static/js/config.js"></script>
     <script src="/static/js/api/client.js?v=20260324a"></script>
     <script src="/static/js/api/groups.js?v=20260324a"></script>

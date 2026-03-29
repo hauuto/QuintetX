@@ -3,6 +3,8 @@ const CONFIG = {
     API_BASE: "/api/v1",
     WS_URL: "/ws/match",
     BOARD_SIZE: 40,
+    MATCH_STEP_DELAY_MS: (window.QX_RUNTIME && window.QX_RUNTIME.MATCH_STEP_DELAY_MS) ? window.QX_RUNTIME.MATCH_STEP_DELAY_MS : 750,
+    MOVE_TIMEOUT_SECONDS: (window.QX_RUNTIME && window.QX_RUNTIME.MOVE_TIMEOUT_SECONDS) ? window.QX_RUNTIME.MOVE_TIMEOUT_SECONDS : 10,
     COLORS: {
         X: "#3547E5", // Blue
         O: "#E53535", // Red
@@ -11,6 +13,7 @@ const CONFIG = {
     },
     LABELS: {
         STATUS_PLAYING: "Đang diễn ra",
+        STATUS_WAITING: "Chờ người chơi",
         STATUS_FINISHED: "Kết thúc",
     }
 };

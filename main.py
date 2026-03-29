@@ -11,7 +11,9 @@ from app.api.auth import router as auth_router
 from app.api.agent import router as agent_router
 from app.api.groups import router as groups_router
 from app.api.matches import router as matches_router
+from app.api.metrics import router as metrics_router
 from app.core.config import settings
+from app.core.metrics import request_metrics
 from app.db.client import close_db, connect_db, get_database
 from app.db.init_db import (
     GROUPS_COLLECTION,
@@ -49,6 +51,30 @@ app = FastAPI(
 )
 
 
+@app.middleware("http")
+async def collect_request_metrics(request: Request, call_next):
+    import time
+
+    start = time.monotonic()
+    response = await call_next(request)
+    elapsed_ms = (time.monotonic() - start) * 1000.0
+
+    try:
+        path = request.url.path
+        if "/api/v1/" in path:
+            request_metrics.observe(
+                method=request.method,
+                path=path,
+                status=response.status_code,
+                elapsed_ms=elapsed_ms,
+            )
+    except Exception:
+        # Metrics must never break requests.
+        pass
+
+    return response
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_: Request, exc: HTTPException):
     message = exc.detail if isinstance(exc.detail, str) else "Request failed"
@@ -75,11 +101,14 @@ async def unhandled_exception_handler(_: Request, exc: Exception):
     )
 
 templates = Jinja2Templates(directory="templates")
+templates.env.globals["QX_MATCH_STEP_DELAY_MS"] = int(max(0.05, float(settings.TIME_PER_MOVE)) * 1000)
+templates.env.globals["QX_MOVE_TIMEOUT_SECONDS"] = int(settings.MOVE_TIMEOUT_SECONDS)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(auth_router)
 app.include_router(agent_router)
 app.include_router(groups_router)
 app.include_router(matches_router)
+app.include_router(metrics_router)
 
 EMPTY_MATCH = {
     "id": "",

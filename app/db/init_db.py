@@ -193,6 +193,22 @@ async def _ensure_indexes(database: Any) -> None:
     )
 
     await database[MATCHES_COLLECTION].create_index(
+        [("start_time", -1)],
+        name="idx_matches_start_time",
+    )
+
+    # Speed up "my latest match" lookups and sorting by created_at.
+    await database[MATCHES_COLLECTION].create_index(
+        [("teams.X.team_id", 1), ("created_at", -1)],
+        name="idx_matches_team_x_created_at",
+    )
+
+    await database[MATCHES_COLLECTION].create_index(
+        [("teams.O.team_id", 1), ("created_at", -1)],
+        name="idx_matches_team_o_created_at",
+    )
+
+    await database[MATCHES_COLLECTION].create_index(
         [("teams.X.team_id", 1)],
         name="uq_active_team_x",
         unique=True,

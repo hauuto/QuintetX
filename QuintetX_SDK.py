@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import getpass
+import json
+import os
 import random
 import threading
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable, Optional, Tuple
 
 import requests
@@ -13,6 +17,108 @@ JsonDict = dict
 Board = list[list[int]]
 NextMoveFunc = Callable[[Board], Tuple[int, int]]
 StrategyFunc = Callable[[JsonDict], Tuple[int, int]]
+
+
+@dataclass
+class StudentSession:
+    access_token: str
+    token_type: str = "bearer"
+    mssv: str | None = None
+    saved_at_unix: float | None = None
+
+
+def _session_default_path() -> Path:
+    # "Cùng thư mục script" in practice maps best to the current working directory.
+    return Path(os.getcwd()) / ".quintetx_session.json"
+
+
+def _read_json_file(path: Path) -> dict:
+    try:
+        if not path.exists():
+            return {}
+        return json.loads(path.read_text(encoding="utf-8") or "{}")
+    except Exception:
+        return {}
+
+
+def _write_json_file(path: Path, data: dict) -> None:
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _extract_message(payload: JsonDict) -> str:
+    return str(payload.get("message") or payload.get("detail") or payload.get("error") or "").strip()
+
+
+def _auth_post(server_url: str, path: str, *, json_body: dict, timeout_seconds: float) -> JsonDict:
+    url = f"{server_url.rstrip('/')}{path}"
+    try:
+        resp = requests.post(url, json=json_body, timeout=timeout_seconds)
+        try:
+            payload = resp.json()
+        except Exception:
+            return {
+                "status": "error",
+                "data": {},
+                "message": f"Non-JSON response: HTTP {resp.status_code}",
+                "http_status": int(resp.status_code),
+            }
+
+        if isinstance(payload, dict):
+            payload.setdefault("http_status", int(resp.status_code))
+            if not resp.ok and payload.get("status") != "error":
+                payload["status"] = "error"
+            return payload
+        return {
+            "status": "error" if not resp.ok else "success",
+            "data": {"raw": payload},
+            "message": "" if resp.ok else f"HTTP {resp.status_code}",
+            "http_status": int(resp.status_code),
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "data": {},
+            "message": f"Network error: {exc}",
+            "http_status": None,
+        }
+
+
+def _auth_get(server_url: str, path: str, *, access_token: str, timeout_seconds: float) -> JsonDict:
+    url = f"{server_url.rstrip('/')}{path}"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=timeout_seconds)
+        try:
+            payload = resp.json()
+        except Exception:
+            return {
+                "status": "error",
+                "data": {},
+                "message": f"Non-JSON response: HTTP {resp.status_code}",
+                "http_status": int(resp.status_code),
+            }
+
+        if isinstance(payload, dict):
+            payload.setdefault("http_status", int(resp.status_code))
+            if not resp.ok and payload.get("status") != "error":
+                payload["status"] = "error"
+                payload.setdefault("data", {})
+                if not payload.get("message"):
+                    payload["message"] = str(payload.get("detail") or f"HTTP {resp.status_code}")
+            return payload
+        return {
+            "status": "error" if not resp.ok else "success",
+            "data": {"raw": payload},
+            "message": "" if resp.ok else f"HTTP {resp.status_code}",
+            "http_status": int(resp.status_code),
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "data": {},
+            "message": f"Network error: {exc}",
+            "http_status": None,
+        }
 
 
 @dataclass(frozen=True)
@@ -65,6 +171,218 @@ class QuintetXClient:
 
         self._stop_heartbeat = threading.Event()
         self._heartbeat_thread: Optional[threading.Thread] = None
+
+    # -------------------------
+    # Login-based bootstrap (Student)
+    # -------------------------
+
+    @staticmethod
+    def _prompt_student_credentials() -> tuple[str, str]:
+        mssv = input("MSSV: ").strip()
+        password = getpass.getpass("Password: ").strip()
+        return mssv, password
+
+    @staticmethod
+    def _load_session(session_file: Path) -> StudentSession | None:
+        data = _read_json_file(session_file)
+        token = str(data.get("access_token") or "").strip()
+        if not token:
+            return None
+        return StudentSession(
+            access_token=token,
+            token_type=str(data.get("token_type") or "bearer"),
+            mssv=str(data.get("mssv") or "").strip() or None,
+            saved_at_unix=float(data.get("saved_at_unix")) if data.get("saved_at_unix") is not None else None,
+        )
+
+    @staticmethod
+    def _save_session(session_file: Path, session: StudentSession) -> None:
+        _write_json_file(
+            session_file,
+            {
+                "access_token": session.access_token,
+                "token_type": session.token_type,
+                "mssv": session.mssv,
+                "saved_at_unix": session.saved_at_unix or time.time(),
+            },
+        )
+
+    @staticmethod
+    def _login_student(
+        server_url: str,
+        *,
+        mssv: str,
+        password: str,
+        timeout_seconds: float,
+    ) -> tuple[StudentSession | None, JsonDict]:
+        payload = _auth_post(
+            server_url,
+            "/api/v1/auth/login/student",
+            json_body={"mssv": mssv, "password": password},
+            timeout_seconds=timeout_seconds,
+        )
+        if payload.get("status") != "success":
+            return None, payload
+
+        data = payload.get("data") or {}
+        token = str(data.get("access_token") or "").strip()
+        token_type = str(data.get("token_type") or "bearer").strip() or "bearer"
+        if not token:
+            return None, {
+                "status": "error",
+                "data": {},
+                "message": "Login succeeded but access_token is missing",
+            }
+
+        user = data.get("user") or {}
+        session = StudentSession(access_token=token, token_type=token_type, mssv=str(user.get("mssv") or "").strip() or mssv)
+        return session, payload
+
+    @staticmethod
+    def _resolve_my_team_credentials(
+        server_url: str,
+        *,
+        access_token: str,
+        timeout_seconds: float,
+    ) -> tuple[tuple[str, str] | None, JsonDict]:
+        payload = _auth_get(
+            server_url,
+            "/api/v1/matches/me",
+            access_token=access_token,
+            timeout_seconds=timeout_seconds,
+        )
+        if payload.get("status") != "success":
+            return None, payload
+
+        data = payload.get("data") or {}
+        my_team = data.get("my_team")
+        if not my_team:
+            return None, {
+                "status": "error",
+                "data": {},
+                "message": "No active match for your team (waiting/playing).",
+            }
+
+        team_id = str(my_team.get("id") or "").strip()
+        api_key = str(my_team.get("api_key") or "").strip()
+        if not team_id or not api_key:
+            return None, {
+                "status": "error",
+                "data": {},
+                "message": "Cannot resolve team_id/api_key from /matches/me",
+            }
+
+        return (team_id, api_key), payload
+
+    @classmethod
+    def from_student_login(
+        cls,
+        *,
+        server_url: str,
+        session_file: str | os.PathLike[str] | None = None,
+        timeout_seconds: float = 5.0,
+        log: Callable[[str], None] | None = print,
+        prompt_login: bool = True,
+        mssv: str | None = None,
+        password: str | None = None,
+    ) -> QuintetXClient:
+        """Tạo client bằng cách đăng nhập student và tự lấy team_id/api_key.
+
+        Flow:
+        - Lần đầu: hỏi MSSV + password, login lấy JWT, lưu vào session file.
+        - Lần sau: đọc JWT từ session file và dùng lại.
+        - Dùng JWT gọi `GET /api/v1/matches/me` để lấy `my_team.id` + `my_team.api_key`.
+        """
+        normalized_server = (server_url or "").strip().rstrip("/")
+        if not normalized_server:
+            raise ValueError("server_url is required")
+
+        session_path = Path(session_file) if session_file else _session_default_path()
+        timeout_s = float(timeout_seconds)
+
+        def _log_local(msg: str) -> None:
+            if not log:
+                return
+            try:
+                log(f"[QuintetX] {msg}")
+            except Exception:
+                pass
+
+        session = cls._load_session(session_path)
+        if session:
+            _log_local(f"Session loaded: {session_path}")
+
+        # Try resolve credentials using existing token first.
+        if session:
+            creds, creds_payload = cls._resolve_my_team_credentials(
+                normalized_server,
+                access_token=session.access_token,
+                timeout_seconds=timeout_s,
+            )
+            if creds:
+                team_id, api_key = creds
+                _log_local("Team confirmed via /matches/me")
+                return cls(
+                    server_url=normalized_server,
+                    team_id=team_id,
+                    api_key=api_key,
+                    timeout_seconds=timeout_s,
+                    log=log,
+                )
+
+            # Token might be expired/invalid.
+            msg = _extract_message(creds_payload)
+            _log_local(f"Session token not usable: {msg or 'unknown error'}")
+
+        if not prompt_login and (mssv is None or password is None):
+            raise RuntimeError(f"Not authenticated. No valid session at {session_path}")
+
+        # Login (non-interactive if credentials are provided).
+        while True:
+            if mssv is not None and password is not None:
+                _log_local("Logging in (student)...")
+                input_mssv, input_password = mssv, password
+            else:
+                _log_local("Please login (student)")
+                input_mssv, input_password = cls._prompt_student_credentials()
+
+            new_session, login_payload = cls._login_student(
+                normalized_server,
+                mssv=input_mssv,
+                password=input_password,
+                timeout_seconds=timeout_s,
+            )
+
+            if not new_session:
+                msg = _extract_message(login_payload) or "Login failed"
+                _log_local(msg)
+                # If caller provided credentials explicitly, don't loop forever.
+                if mssv is not None and password is not None:
+                    raise RuntimeError(msg)
+                continue
+
+            new_session.saved_at_unix = time.time()
+            cls._save_session(session_path, new_session)
+            _log_local(f"Login success. Session saved: {session_path}")
+
+            creds, creds_payload = cls._resolve_my_team_credentials(
+                normalized_server,
+                access_token=new_session.access_token,
+                timeout_seconds=timeout_s,
+            )
+            if not creds:
+                msg = _extract_message(creds_payload) or "Cannot resolve team credentials"
+                raise RuntimeError(msg)
+
+            team_id, api_key = creds
+            _log_local("Team confirmed via /matches/me")
+            return cls(
+                server_url=normalized_server,
+                team_id=team_id,
+                api_key=api_key,
+                timeout_seconds=timeout_s,
+                log=log,
+            )
 
     # -------------------------
     # Low-level HTTP helpers
@@ -194,6 +512,7 @@ class QuintetXClient:
         retry_max_delay_seconds: float = 10.0,
         retry_jitter_seconds: float = 0.2,
         max_attempts: int | None = None,
+        stop_event: threading.Event | None = None,
     ) -> JsonDict:
         """Reconnect /init cho đến khi thành công.
 
@@ -206,6 +525,14 @@ class QuintetXClient:
         jitter = max(0.0, float(retry_jitter_seconds))
 
         while True:
+            if stop_event and stop_event.is_set():
+                return {
+                    "status": "error",
+                    "data": {},
+                    "message": "Cancelled",
+                    "error_type": "cancelled",
+                    "http_status": None,
+                }
             attempt += 1
             if attempt == 1:
                 self._log("Connecting...")
@@ -229,7 +556,10 @@ class QuintetXClient:
             if jitter:
                 sleep_s += random.uniform(0.0, jitter)
             self._log(f"Retry in {sleep_s:.1f}s: {payload.get('message')}")
-            time.sleep(sleep_s)
+            if stop_event:
+                stop_event.wait(sleep_s)
+            else:
+                time.sleep(sleep_s)
             delay = min(max_delay, delay * 1.5)
 
     def get_state(self) -> JsonDict:
@@ -275,6 +605,7 @@ class QuintetXClient:
         start_heartbeat: bool = True,
         heartbeat_interval_seconds: float = 5.0,
         max_steps: int | None = None,
+        stop_event: threading.Event | None = None,
     ) -> None:
         """Vòng lặp tối giản: poll state; nếu đến lượt thì gọi next_move(board) và gửi move.
 
@@ -286,6 +617,7 @@ class QuintetXClient:
             init = self.connect_with_retry(
                 start_heartbeat=start_heartbeat,
                 heartbeat_interval_seconds=heartbeat_interval_seconds,
+                stop_event=stop_event,
             )
             if init.get("status") != "success":
                 message = init.get("message") or f"Cannot connect: {init}"
@@ -297,6 +629,8 @@ class QuintetXClient:
 
         try:
             while True:
+                if stop_event and stop_event.is_set():
+                    return
                 if max_steps is not None and steps >= max_steps:
                     return
 
@@ -337,12 +671,14 @@ class QuintetXClient:
         start_heartbeat: bool = True,
         heartbeat_interval_seconds: float = 5.0,
         max_steps: int | None = None,
+        stop_event: threading.Event | None = None,
     ) -> None:
         """Phiên bản nâng cao: strategy nhận nguyên state_data (bao gồm board/turn/events...)."""
         if connect_first:
             init = self.connect_with_retry(
                 start_heartbeat=start_heartbeat,
                 heartbeat_interval_seconds=heartbeat_interval_seconds,
+                stop_event=stop_event,
             )
             if init.get("status") != "success":
                 message = init.get("message") or f"Cannot connect: {init}"
@@ -352,6 +688,8 @@ class QuintetXClient:
         steps = 0
         try:
             while True:
+                if stop_event and stop_event.is_set():
+                    return
                 if max_steps is not None and steps >= max_steps:
                     return
 

@@ -180,6 +180,7 @@
             speed: '1',
             history: [],
             match: null,
+            playTimerId: null,
 
             get lastMove() {
                 if (this.currentStep === 0) return null;
@@ -206,6 +207,33 @@
 
             togglePlay() {
                 this.isPlaying = !this.isPlaying;
+                if (this.isPlaying) {
+                    this.startAutoPlay();
+                } else {
+                    this.stopAutoPlay();
+                }
+            },
+
+            startAutoPlay() {
+                this.stopAutoPlay();
+                const speedValue = Math.max(0.25, Number(this.speed) || 1);
+                const intervalMs = Math.max(120, Math.round(1000 / speedValue));
+                this.playTimerId = setInterval(() => {
+                    if (!this.isPlaying) return;
+                    if (this.currentStep >= this.totalSteps) {
+                        this.isPlaying = false;
+                        this.stopAutoPlay();
+                        return;
+                    }
+                    this.nextMove();
+                }, intervalMs);
+            },
+
+            stopAutoPlay() {
+                if (this.playTimerId) {
+                    clearInterval(this.playTimerId);
+                    this.playTimerId = null;
+                }
             },
 
             prevMove() {
@@ -226,11 +254,26 @@
             },
 
             setActiveMatch(match) {
-                if (!match) return;
+                this.stopAutoPlay();
+                this.isPlaying = false;
+
+                if (!match) {
+                    this.match = null;
+                    this.history = [];
+                    this.totalSteps = 0;
+                    this.currentStep = 0;
+                    return;
+                }
                 this.match = match;
                 this.history = match.history || [];
                 this.totalSteps = (match.history || []).length;
                 this.currentStep = this.totalSteps;
+            },
+
+            async fetchFullMatch(matchId) {
+                const res = await window.QXApi.matches.getMatch(matchId);
+                const data = res.data || {};
+                return data.match || null;
             },
 
             async loadLatestMatch() {
@@ -260,7 +303,13 @@
                             || null;
                     }
 
-                    this.setActiveMatch(pick);
+                    if (!pick) {
+                        this.setActiveMatch(null);
+                        return;
+                    }
+
+                    const full = await this.fetchFullMatch(pick.id);
+                    this.setActiveMatch(full);
                 } catch (error) {
                     console.error('Failed to load latest match:', error);
                 }

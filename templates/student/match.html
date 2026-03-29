@@ -10,16 +10,36 @@
 
     <template x-if="!loading && currentMatch">
         <div class="flex h-full flex-col lg:flex-row gap-6">
-            <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden relative">
-                <div class="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-6 shrink-0 z-10">
-                    <div class="flex items-center space-x-2">
-                        <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" :class="currentMatch.status === 'playing' ? 'bg-green-500' : 'bg-gray-500'"></span>
-                        <span class="text-sm font-bold text-gray-900" x-text="currentMatch.status === 'playing' ? labels.STATUS_PLAYING : labels.STATUS_FINISHED"></span>
+            <div
+                class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden relative">
+                <div
+                    class="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-6 shrink-0 z-10">
+                    <div class="flex items-center space-x-4">
+                        <a :href="backUrl"
+                            class="inline-flex items-center text-sm font-semibold text-gray-500 hover:text-[#3547E5] transition-colors border-r border-gray-200 pr-4 mr-2">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                            </svg>
+                            Quay lại
+                        </a>
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"
+                                :class="currentMatch.status === 'playing' ? 'bg-green-500' : 'bg-gray-500'"></span>
+                            <span class="text-sm font-bold text-gray-900" x-text="statusLabel"></span>
+                        </div>
                     </div>
-                    <div class="text-sm font-semibold text-gray-900" x-text="currentMatch.room_name"></div>
+                    <div class="flex items-center gap-4">
+                        <div class="text-sm font-mono font-medium text-gray-500"
+                            x-show="currentMatch.status === 'playing'">
+                            <span class="text-gray-900 font-bold" x-text="turnCountdownDisplay"></span>
+                        </div>
+                        <div class="text-sm font-semibold text-gray-900" x-text="currentMatch.room_name"></div>
+                    </div>
                 </div>
 
-                <div class="flex-1 overflow-auto bg-[#F0F2F5] p-4 flex items-center justify-center cursor-move" id="board-container">
+                <div class="flex-1 overflow-auto bg-[#F0F2F5] p-4 flex items-center justify-center cursor-move"
+                    id="board-container">
                     <div class="relative bg-white shadow-lg border border-gray-300 mx-auto"
                         :style="`width: ${boardPixelSize}px; height: ${boardPixelSize}px; background-size: ${cellSize}px ${cellSize}px; background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);`">
 
@@ -27,7 +47,7 @@
                         <template x-if="currentMatch.status === 'finished' && currentMatch.winning_line">
                             <template x-for="pt in currentMatch.winning_line" :key="pt[0] + '-' + pt[1]">
                                 <div class="absolute bg-yellow-200 opacity-60"
-                                     :style="`left: ${pt[0] * cellSize}px; top: ${pt[1] * cellSize}px; width: ${cellSize}px; height: ${cellSize}px;`">
+                                    :style="`left: ${pt[0] * cellSize}px; top: ${pt[1] * cellSize}px; width: ${cellSize}px; height: ${cellSize}px;`">
                                 </div>
                             </template>
                         </template>
@@ -35,7 +55,9 @@
                         <template x-for="move in currentMatch.history" :key="move.order">
                             <div class="absolute flex items-center justify-center"
                                 :style="`left: ${move.x * cellSize}px; top: ${move.y * cellSize}px; width: ${cellSize}px; height: ${cellSize}px;`">
-                                <span class="font-bold text-xs" :class="move.team === 'X' ? 'text-[#3547E5]' : 'text-[#E53535]'" x-text="move.team"></span>
+                                <span class="font-bold text-xs"
+                                    :class="move.team === 'X' ? 'text-[#3547E5]' : 'text-[#E53535]'"
+                                    x-text="move.team"></span>
                             </div>
                         </template>
                     </div>
@@ -50,9 +72,11 @@
                         <div class="flex items-center justify-between p-2 rounded"
                             :class="myTeam && myTeam.side === 'X' ? 'bg-blue-50 border border-blue-100' : 'bg-white border border-gray-100'">
                             <div class="flex items-center">
-                                <span class="w-6 h-6 rounded flex items-center justify-center bg-[#3547E5] text-white text-xs font-bold mr-2">X</span>
+                                <span
+                                    class="w-6 h-6 rounded flex items-center justify-center bg-[#3547E5] text-white text-xs font-bold mr-2">X</span>
                                 <div>
-                                    <span class="font-bold text-gray-900 text-sm block" x-text="currentMatch.teams.X.name"></span>
+                                    <span class="font-bold text-gray-900 text-sm block"
+                                        x-text="currentMatch.teams.X.name"></span>
                                     <div class="flex items-center gap-1.5 mt-0.5">
                                         <template x-if="currentMatch.teams.X.is_connected">
                                             <span class="text-[10px] font-bold text-green-600 uppercase">Online</span>
@@ -68,9 +92,11 @@
                         <div class="flex items-center justify-between p-2 rounded"
                             :class="myTeam && myTeam.side === 'O' ? 'bg-blue-50 border border-blue-100' : 'bg-white border border-gray-100'">
                             <div class="flex items-center">
-                                <span class="w-6 h-6 rounded flex items-center justify-center bg-[#E53535] text-white text-xs font-bold mr-2">O</span>
+                                <span
+                                    class="w-6 h-6 rounded flex items-center justify-center bg-[#E53535] text-white text-xs font-bold mr-2">O</span>
                                 <div>
-                                    <span class="font-bold text-gray-900 text-sm block" x-text="currentMatch.teams.O.name"></span>
+                                    <span class="font-bold text-gray-900 text-sm block"
+                                        x-text="currentMatch.teams.O.name"></span>
                                     <div class="flex items-center gap-1.5 mt-0.5">
                                         <template x-if="currentMatch.teams.O.is_connected">
                                             <span class="text-[10px] font-bold text-green-600 uppercase">Online</span>
@@ -102,8 +128,11 @@
                                 <template x-for="move in currentMatch.history" :key="move.order">
                                     <tr class="text-xs">
                                         <td class="px-3 py-2 text-gray-500 font-mono" x-text="move.order"></td>
-                                        <td class="px-3 py-2 font-bold" :class="move.team === 'X' ? 'text-[#3547E5]' : 'text-[#E53535]'" x-text="move.team"></td>
-                                        <td class="px-3 py-2 text-gray-700 font-mono text-right" x-text="move.coord"></td>
+                                        <td class="px-3 py-2 font-bold"
+                                            :class="move.team === 'X' ? 'text-[#3547E5]' : 'text-[#E53535]'"
+                                            x-text="move.team"></td>
+                                        <td class="px-3 py-2 text-gray-700 font-mono text-right" x-text="move.coord">
+                                        </td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -114,13 +143,15 @@
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 h-52 flex flex-col overflow-hidden">
                     <div class="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
                         <h3 class="text-xs font-bold text-gray-900 uppercase">Match Event Log</h3>
-                        <span class="text-[10px] font-semibold text-gray-500" x-text="currentMatch.events ? currentMatch.events.length : 0"></span>
+                        <span class="text-[10px] font-semibold text-gray-500"
+                            x-text="currentMatch.events ? currentMatch.events.length : 0"></span>
                     </div>
                     <div class="flex-1 overflow-y-auto p-2 space-y-1">
                         <template x-if="!currentMatch.events || currentMatch.events.length === 0">
                             <p class="text-xs text-gray-400 px-2 py-1">Chưa có sự kiện.</p>
                         </template>
-                        <template x-for="(eventItem, idx) in (currentMatch.events || []).slice().reverse()" :key="`${eventItem.created_at}-${idx}`">
+                        <template x-for="(eventItem, idx) in (currentMatch.events || []).slice().reverse()"
+                            :key="`${eventItem.created_at}-${idx}`">
                             <div class="px-2 py-1.5 rounded border border-gray-100 bg-white">
                                 <p class="text-[11px] font-semibold text-gray-700" x-text="eventItem.type"></p>
                                 <p class="text-xs text-gray-900" x-text="eventItem.message"></p>
@@ -130,19 +161,6 @@
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 shrink-0 flex items-center justify-between">
-                    <div class="flex flex-col min-w-0 mr-3">
-                        <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">API Key</h3>
-                        <code class="text-xs font-mono text-gray-900 truncate" x-text="myTeam && myTeam.api_key ? myTeam.api_key : ''"></code>
-                    </div>
-                    <button
-                        @click="copyApiKey()"
-                        class="bg-[#3547E5] hover:bg-blue-700 text-white text-[10px] font-bold px-3 py-1.5 rounded transition-colors shrink-0 uppercase tracking-wider"
-                        :class="apiKeyCopied ? 'bg-green-500 hover:bg-green-600' : ''"
-                    >
-                        <span x-text="apiKeyCopied ? 'COPIED' : 'COPY'"></span>
-                    </button>
-                </div>
             </div>
         </div>
     </template>
@@ -151,14 +169,20 @@
     <template x-if="currentMatch.status === 'finished' && showingWinnerPopup">
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" x-transition>
             <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center border-t-4"
-                 :class="currentMatch.winner === myTeam?.side ? 'border-green-500' : (currentMatch.winner ? 'border-red-500' : 'border-gray-500')">
+                :class="currentMatch.winner === myTeam?.side ? 'border-green-500' : (currentMatch.winner ? 'border-red-500' : 'border-gray-500')">
                 <div class="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4"
-                     :class="currentMatch.winner === myTeam?.side ? 'bg-green-100 text-green-600' : (currentMatch.winner ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600')">
+                    :class="currentMatch.winner === myTeam?.side ? 'bg-green-100 text-green-600' : (currentMatch.winner ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600')">
                     <template x-if="currentMatch.winner === myTeam?.side">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7">
+                            </path>
+                        </svg>
                     </template>
                     <template x-if="currentMatch.winner && currentMatch.winner !== myTeam?.side">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
                     </template>
                     <template x-if="!currentMatch.winner">
                         <span class="font-bold text-xl">-</span>
@@ -166,7 +190,8 @@
                 </div>
 
                 <h2 class="text-2xl font-bold text-gray-900 mb-2">
-                    <span x-text="currentMatch.winner === 'X' ? currentMatch.teams.X.name : (currentMatch.winner === 'O' ? currentMatch.teams.O.name : 'Hòa')"></span>
+                    <span
+                        x-text="currentMatch.winner === 'X' ? currentMatch.teams.X.name : (currentMatch.winner === 'O' ? currentMatch.teams.O.name : 'Hòa')"></span>
                 </h2>
                 <p class="text-sm font-semibold text-gray-600 mb-1">
                     <template x-if="currentMatch.winner">
@@ -176,9 +201,12 @@
                         <span>Trận đấu kết thúc với kết quả hòa.</span>
                     </template>
                 </p>
-                <p class="text-xs text-gray-500 mb-6" x-text="'Lý do: ' + (currentMatch.finish_reason === 'win' ? 'Tạo 5 quân liên tiếp' : (currentMatch.finish_reason === 'timeout_forfeit' ? 'Đối thủ hết thời gian' : currentMatch.finish_reason))"></p>
+                <p class="text-xs text-gray-500 mb-6"
+                    x-text="'Lý do: ' + (currentMatch.finish_reason === 'win' ? 'Tạo 5 quân liên tiếp' : (currentMatch.finish_reason === 'timeout_forfeit' ? 'Đối thủ hết thời gian' : currentMatch.finish_reason))">
+                </p>
 
-                <button @click="showingWinnerPopup = false" class="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-900 font-bold rounded-lg transition-colors text-sm uppercase">Đóng</button>
+                <button @click="showingWinnerPopup = false"
+                    class="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-900 font-bold rounded-lg transition-colors text-sm uppercase">Đóng</button>
             </div>
         </div>
     </template>
@@ -198,7 +226,8 @@
                             <div class="border border-gray-100 rounded-lg p-3 flex items-center justify-between">
                                 <div>
                                     <p class="text-sm font-bold text-gray-900" x-text="match.room_name"></p>
-                                    <p class="text-xs text-gray-500" x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
+                                    <p class="text-xs text-gray-500"
+                                        x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
                                 </div>
                                 <span class="text-xs font-bold text-green-600">Đang diễn ra</span>
                             </div>
@@ -216,7 +245,8 @@
                             <div class="border border-gray-100 rounded-lg p-3 flex items-center justify-between">
                                 <div>
                                     <p class="text-sm font-bold text-gray-900" x-text="match.room_name"></p>
-                                    <p class="text-xs text-gray-500" x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
+                                    <p class="text-xs text-gray-500"
+                                        x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
                                 </div>
                                 <span class="text-xs font-bold text-yellow-600">Sắp tới</span>
                             </div>
@@ -234,7 +264,8 @@
                             <div class="border border-gray-100 rounded-lg p-3 flex items-center justify-between">
                                 <div>
                                     <p class="text-sm font-bold text-gray-900" x-text="match.room_name"></p>
-                                    <p class="text-xs text-gray-500" x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
+                                    <p class="text-xs text-gray-500"
+                                        x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
                                 </div>
                                 <span class="text-xs font-bold text-gray-500">Kết thúc</span>
                             </div>
@@ -252,9 +283,15 @@
             loading: true,
             currentMatch: null,
             myTeam: null,
+            replayMode: false,
+            replayMatchId: null,
+            lastRev: null,
             pollTimerId: null,
+            pollInFlight: false,
+            pollStopped: false,
+            pollVisibilityListenerAdded: false,
+            countdownTimerId: null,
             showingWinnerPopup: false,
-            apiKeyCopied: false,
             lastStatus: null,
             otherMatches: {
                 current_matches: [],
@@ -262,30 +299,160 @@
                 finished_matches: [],
             },
             labels: CONFIG.LABELS,
+            turnSecondsLeft: null,
             cellSize: 20,
             boardPixelSize: CONFIG.BOARD_SIZE * 20,
 
+            get backUrl() {
+                if (this.replayMode) return '/student/history';
+                return '/student/dashboard';
+            },
+
+            get statusLabel() {
+                const status = (this.currentMatch && this.currentMatch.status) || '';
+                if (status === 'playing') return this.labels.STATUS_PLAYING;
+                if (status === 'waiting') return this.labels.STATUS_WAITING;
+                return this.labels.STATUS_FINISHED;
+            },
+
+            get turnCountdownDisplay() {
+                if (this.turnSecondsLeft === null || this.turnSecondsLeft === undefined) return '';
+                const v = Math.max(0, Number(this.turnSecondsLeft) || 0);
+                return `${v}s`;
+            },
+
             async init() {
-                await this.loadMyMatch();
+                const rawView = localStorage.getItem('qx_view_match');
+                if (rawView) {
+                    this.replayMode = true;
+                    this.replayMatchId = rawView;
+                    localStorage.removeItem('qx_view_match');
+                    await this.loadMatchById(rawView);
+                    this.startCountdown();
+                    if (!this.currentMatch) {
+                        this.replayMode = false;
+                        this.replayMatchId = null;
+                        await this.loadMyMatchFull();
+                        this.startPolling();
+                    }
+                    return;
+                }
+
+                await this.loadMyMatchFull();
                 this.startPolling();
+                this.startCountdown();
+            },
+
+            async loadMatchById(matchId) {
+                this.loading = true;
+                try {
+                    const result = await window.QXApi.matches.getMatch(matchId);
+                    const data = result.data || {};
+                    this.currentMatch = data.match || null;
+                    this.myTeam = null;
+                    this.otherMatches = {
+                        current_matches: [],
+                        upcoming_matches: [],
+                        finished_matches: [],
+                    };
+                    this.lastRev = this.currentMatch ? Number(this.currentMatch.rev) : null;
+                    this.updateCountdown();
+                    this.handleStatusTransitions();
+                } catch (error) {
+                    this.currentMatch = null;
+                    this.myTeam = null;
+                    this.replayMode = false;
+                    this.replayMatchId = null;
+                    if (window.QXToast && window.QXToast.show) {
+                        window.QXToast.show(error.message || 'Không thể tải trận đấu.', 'error');
+                    }
+                } finally {
+                    this.loading = false;
+                }
             },
 
             startPolling() {
+                this.pollStopped = false;
                 if (this.pollTimerId) {
-                    clearInterval(this.pollTimerId);
+                    clearTimeout(this.pollTimerId);
                 }
-                this.pollTimerId = setInterval(() => {
-                    this.loadMyMatch(false);
-                }, 750);
+
+                if (!this.pollVisibilityListenerAdded) {
+                    this.pollVisibilityListenerAdded = true;
+                    document.addEventListener('visibilitychange', () => {
+                        if (!document.hidden) {
+                            this.loadMyMatchSummary();
+                        }
+                    }, { passive: true });
+                }
+
+                const delayMs = Math.max(200, Number(CONFIG.MATCH_STEP_DELAY_MS) || 750);
+                const loop = async () => {
+                    if (this.pollStopped) return;
+
+                    if (document.hidden) {
+                        this.pollTimerId = setTimeout(loop, Math.min(5000, delayMs));
+                        return;
+                    }
+
+                    if (this.pollInFlight) {
+                        this.pollTimerId = setTimeout(loop, delayMs);
+                        return;
+                    }
+
+                    this.pollInFlight = true;
+                    try {
+                        await this.loadMyMatchSummary();
+                    } finally {
+                        this.pollInFlight = false;
+                    }
+
+                    this.pollTimerId = setTimeout(loop, delayMs);
+                };
+
+                loop();
             },
 
-            copyApiKey() {
-                if (this.myTeam && this.myTeam.api_key) {
-                    const text = this.myTeam.api_key;
-                    window.QXCopy(text, 'Đã sao chép API Key');
-                    this.apiKeyCopied = true;
-                    setTimeout(() => this.apiKeyCopied = false, 2000);
+            stopPolling() {
+                this.pollStopped = true;
+                if (this.pollTimerId) {
+                    clearTimeout(this.pollTimerId);
+                    this.pollTimerId = null;
                 }
+            },
+
+            startCountdown() {
+                if (this.countdownTimerId) {
+                    clearInterval(this.countdownTimerId);
+                }
+
+                this.countdownTimerId = setInterval(() => {
+                    this.updateCountdown();
+                }, 200);
+            },
+
+            updateCountdown() {
+                const match = this.currentMatch;
+                if (!match || match.status !== 'playing') {
+                    this.turnSecondsLeft = null;
+                    return;
+                }
+
+                const iso = match.turn_deadline_at;
+                if (!iso) {
+                    this.turnSecondsLeft = null;
+                    return;
+                }
+
+                const deadline = new Date(iso);
+                if (Number.isNaN(deadline.getTime())) {
+                    this.turnSecondsLeft = null;
+                    return;
+                }
+
+                const diffMs = deadline.getTime() - Date.now();
+                const left = Math.max(0, Math.ceil(diffMs / 1000));
+                this.turnSecondsLeft = left;
             },
 
             copyApiBody() {
@@ -293,7 +460,49 @@
                 window.QXCopy(text, 'Đã sao chép API Body');
             },
 
-            async loadMyMatch(showLoading = true) {
+            mergeSummaryIntoCurrentMatch(summary) {
+                if (!summary) return;
+                if (!this.currentMatch || this.currentMatch.id !== summary.id) {
+                    this.currentMatch = summary;
+                    this.lastRev = Number(summary.rev);
+                    return;
+                }
+
+                const prev = this.currentMatch;
+                const mergedTeams = {
+                    X: {
+                        ...(prev.teams?.X || {}),
+                        ...(summary.teams?.X || {}),
+                    },
+                    O: {
+                        ...(prev.teams?.O || {}),
+                        ...(summary.teams?.O || {}),
+                    },
+                };
+
+                this.currentMatch = {
+                    ...prev,
+                    ...summary,
+                    teams: mergedTeams,
+                    history: prev.history || [],
+                    events: prev.events || [],
+                };
+                this.lastRev = Number(summary.rev);
+            },
+
+            handleStatusTransitions() {
+                if (this.currentMatch) {
+                    if (this.lastStatus && this.lastStatus !== 'finished' && this.currentMatch.status === 'finished') {
+                        this.showingWinnerPopup = true;
+                    }
+                    this.lastStatus = this.currentMatch.status;
+                } else {
+                    this.lastStatus = null;
+                    this.showingWinnerPopup = false;
+                }
+            },
+
+            async loadMyMatchFull(showLoading = true) {
                 if (showLoading) {
                     this.loading = true;
                 }
@@ -302,28 +511,76 @@
                     const data = result.data || {};
                     this.currentMatch = data.my_current_match || null;
                     this.myTeam = data.my_team || null;
-
-                    if (this.currentMatch) {
-                        if (this.lastStatus && this.lastStatus !== 'finished' && this.currentMatch.status === 'finished') {
-                            this.showingWinnerPopup = true;
-                        }
-                        this.lastStatus = this.currentMatch.status;
-                    } else {
-                        this.lastStatus = null;
-                        this.showingWinnerPopup = false;
-                    }
-
                     this.otherMatches = data.other_matches || {
                         current_matches: [],
                         upcoming_matches: [],
                         finished_matches: [],
                     };
+                    this.lastRev = this.currentMatch ? Number(this.currentMatch.rev) : null;
+                    this.updateCountdown();
+                    this.handleStatusTransitions();
                 } catch (error) {
                     if (window.QXToast && window.QXToast.show) {
                         window.QXToast.show(error.message || 'Không thể tải dữ liệu trận đấu.', 'error');
                     }
                 } finally {
                     if (showLoading) {
+                        this.loading = false;
+                    }
+                }
+            },
+
+            async loadMyMatchSummary() {
+                try {
+                    if (this.replayMode) {
+                        return;
+                    }
+                    const sinceRev = this.currentMatch ? Number(this.currentMatch.rev) : null;
+                    const result = await window.QXApi.matches.getMyMatchSummary(sinceRev);
+                    const data = result.data || {};
+
+                    const summaryMatch = data.my_current_match || null;
+                    const revChanged = !!data.rev_changed;
+
+                    // No match for me: show other matches list.
+                    if (!summaryMatch) {
+                        this.currentMatch = null;
+                        this.myTeam = data.my_team || null;
+                        this.otherMatches = data.other_matches || {
+                            current_matches: [],
+                            upcoming_matches: [],
+                            finished_matches: [],
+                        };
+                        this.updateCountdown();
+                        this.handleStatusTransitions();
+                        if (this.loading) this.loading = false;
+                        return;
+                    }
+
+                    // If match id changed (new match created), refresh full.
+                    if (!this.currentMatch || this.currentMatch.id !== summaryMatch.id) {
+                        await this.loadMyMatchFull(false);
+                        if (this.loading) this.loading = false;
+                        return;
+                    }
+
+                    // Merge light fields (status/turn/deadline/connectivity) every poll.
+                    this.mergeSummaryIntoCurrentMatch(summaryMatch);
+                    this.myTeam = data.my_team || this.myTeam;
+                    this.updateCountdown();
+                    this.handleStatusTransitions();
+                    if (this.loading) this.loading = false;
+
+                    // Only refresh full payload when something actually changed.
+                    if (revChanged) {
+                        await this.loadMyMatchFull(false);
+                    }
+                } catch (error) {
+                    if (window.QXToast && window.QXToast.show) {
+                        window.QXToast.show(error.message || 'Không thể tải dữ liệu trận đấu.', 'error');
+                    }
+                } finally {
+                    if (this.loading) {
                         this.loading = false;
                     }
                 }

@@ -78,6 +78,9 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# QuintetX SDK (local auth session)
+.quintetx_session.json
+
 # IPython
 profile_default/
 ipython_config.py

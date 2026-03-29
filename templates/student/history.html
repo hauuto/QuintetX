@@ -1,7 +1,7 @@
 {% extends "student/base_student.html" %}
 
 {% block student_content %}
-<div class="w-full max-w-7xl mx-auto space-y-8">
+<div class="w-full max-w-7xl mx-auto space-y-8" x-data="studentHistory()" x-init="init()">
 
     <!-- Header -->
     <div>
@@ -27,46 +27,98 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 text-sm">
-                    {% for match in matches %}
-                    <!-- History Item -->
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 text-gray-500 font-mono text-center">{{ loop.index }}</td>
-                        <td class="px-6 py-4 font-mono text-gray-600">#{{ match.id }}</td>
-                        <td class="px-6 py-4 font-semibold text-gray-900">
-                             {% if match.teams.X.team_id == request.user_id %} <!-- Note: Assume request.user_id or similar context is available, for now hardcode comparison logic or just display raw -->
-                                {{ match.teams.O.name }}
-                            {% else %}
-                                {{ match.teams.X.name }}
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 text-center text-gray-600">{{ match.move_count }}</td>
-                        <td class="px-6 py-4 text-center">
-                             {% if match.winner == "X" %}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span>
-                            {% elif match.winner == "O" %}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">Thua</span>
-                            {% else %}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-800">Hòa</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 text-gray-500 text-right">{{ match.start_time }}</td>
-                        <td class="px-6 py-4 text-center">
-                            <a href="#" class="text-[#3547E5] hover:underline font-medium">Xem lại</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
+                    <template x-for="(m, idx) in matches" :key="m.id">
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4 text-gray-500 font-mono text-center" x-text="idx + 1"></td>
+                            <td class="px-6 py-4 font-mono text-gray-600" x-text="'#' + (m.id || '')"></td>
+                            <td class="px-6 py-4 font-semibold text-gray-900" x-text="opponentName(m)"></td>
+                            <td class="px-6 py-4 text-center text-gray-600" x-text="m.move_count ?? 0"></td>
+                            <td class="px-6 py-4 text-center">
+                                <template x-if="resultFor(m) === 'win'">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">Thắng</span>
+                                </template>
+                                <template x-if="resultFor(m) === 'loss'">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">Thua</span>
+                                </template>
+                                <template x-if="resultFor(m) === 'draw'">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-800">Hòa</span>
+                                </template>
+                            </td>
+                            <td class="px-6 py-4 text-gray-500 text-right" x-text="formatTs(m.finished_at || m.updated_at || m.created_at)"></td>
+                            <td class="px-6 py-4 text-center">
+                                <button type="button" @click="viewMatch(m.id)" class="text-[#3547E5] hover:underline font-medium">Xem lại</button>
+                            </td>
+                        </tr>
+                    </template>
+
+                    <template x-if="matches.length === 0">
+                        <tr>
+                            <td colspan="7" class="px-6 py-10 text-center text-sm text-gray-500">Không có dữ liệu</td>
+                        </tr>
+                    </template>
                 </tbody>
             </table>
         </div>
         <!-- Pagination -->
         <div class="bg-gray-50 border-t border-gray-100 px-6 py-4 flex items-center justify-between">
-            <span class="text-xs text-gray-500">Hiển thị 1-3 trong 24 kết quả</span>
+            <span class="text-xs text-gray-500" x-text="'Hiển thị ' + matches.length + ' kết quả'"></span>
             <div class="flex space-x-2">
-                <button class="px-3 py-1 rounded border border-gray-200 bg-white text-gray-500 text-xs hover:bg-gray-50 disabled:opacity-50">Trước</button>
-                <button class="px-3 py-1 rounded border border-gray-200 bg-white text-gray-500 text-xs hover:bg-gray-50">Sau</button>
+                <button disabled class="px-3 py-1 rounded border border-gray-200 bg-white text-gray-500 text-xs hover:bg-gray-50 disabled:opacity-50">Trước</button>
+                <button disabled class="px-3 py-1 rounded border border-gray-200 bg-white text-gray-500 text-xs hover:bg-gray-50 disabled:opacity-50">Sau</button>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    function studentHistory() {
+        return {
+            matches: [],
+
+            opponentName(m) {
+                if (!m) return '';
+                const mySide = m.my_side;
+                const teams = m.teams || {};
+                if (mySide === 'X') return (teams.O && teams.O.name) ? teams.O.name : '';
+                if (mySide === 'O') return (teams.X && teams.X.name) ? teams.X.name : '';
+                return '';
+            },
+
+            resultFor(m) {
+                if (!m) return 'draw';
+                if (!m.winner) return 'draw';
+                if (m.my_side && m.winner === m.my_side) return 'win';
+                return 'loss';
+            },
+
+            formatTs(ts) {
+                if (!ts) return '';
+                try {
+                    const d = new Date(ts);
+                    if (Number.isNaN(d.getTime())) return String(ts);
+                    return d.toLocaleString();
+                } catch {
+                    return String(ts);
+                }
+            },
+
+            viewMatch(matchId) {
+                if (!matchId) return;
+                localStorage.setItem('qx_view_match', matchId);
+                window.location.href = '/student/match';
+            },
+
+            async init() {
+                try {
+                    const res = await window.QXApi.matches.getMyHistory(100);
+                    this.matches = (res.data && res.data.matches) ? res.data.matches : [];
+                } catch (e) {
+                    console.error('[StudentHistory] load failed', e);
+                    this.matches = [];
+                }
+            }
+        }
+    }
+</script>
 {% endblock %}
 
