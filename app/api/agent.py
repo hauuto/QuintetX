@@ -10,8 +10,10 @@ from app.api.deps import get_agent_session
 from app.core.config import settings
 from app.db.client import get_database
 from app.db.init_db import MATCHES_COLLECTION
+from solutions.solution_greedy import strategy as greedy_strategy
 
 router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
+GREEDY_BOT_TEAM_ID = "T9999GREEDY01"
 
 
 class MoveRequest(BaseModel):
@@ -99,6 +101,186 @@ def _check_win(board: list[list[int]], x: int, y: int, value: int) -> bool:
             return True
 
     return False
+
+
+def _is_greedy_bot_side(match: dict[str, Any], side: str) -> bool:
+    return match.get("teams", {}).get(side, {}).get("team_id") == GREEDY_BOT_TEAM_ID
+
+
+def _first_empty_cell(board: list[list[int]]) -> tuple[int, int] | None:
+    for x in range(settings.BOARD_SIZE):
+        for y in range(settings.BOARD_SIZE):
+            if board[x][y] == 0:
+                return x, y
+    return None
+
+
+def _resolve_greedy_bot_move(board: list[list[int]], side: str) -> tuple[int, int] | None:
+    fallback = _first_empty_cell(board)
+    if not fallback:
+        return None
+
+    try:
+        move = greedy_strategy({"board": board, "side": side})
+    except Exception:
+        return fallback
+
+    if not isinstance(move, (tuple, list)) or len(move) != 2:
+        return fallback
+
+    try:
+        x = int(move[0])
+        y = int(move[1])
+    except Exception:
+        return fallback
+
+    if not (0 <= x < settings.BOARD_SIZE and 0 <= y < settings.BOARD_SIZE):
+        return fallback
+
+    if board[x][y] != 0:
+        return fallback
+
+    return (x, y)
+
+
+async def _play_greedy_bot_turn_if_needed(match: dict[str, Any]) -> dict[str, Any]:
+    if not match or match.get("status") != "playing":
+        return match
+
+    bot_side = str(match.get("current_turn") or "")
+    if bot_side not in ("X", "O"):
+        return match
+    if not _is_greedy_bot_side(match, bot_side):
+        return match
+
+    database = get_database()
+    match_id = match.get("_id")
+    team_id = match.get("teams", {}).get(bot_side, {}).get("team_id")
+    board = match.get("board", [])
+    move = _resolve_greedy_bot_move(board, bot_side)
+
+    if not move:
+        now = _now_utc()
+        await database[MATCHES_COLLECTION].update_one(
+            {"_id": match_id, "status": "playing"},
+            {
+                "$set": {
+                    "status": "finished",
+                    "winner": None,
+                    "finished_at": now,
+                    "finish_reason": "draw",
+                    "turn_deadline_at": None,
+                    "updated_at": now,
+                },
+                "$inc": {"rev": 1},
+                "$push": {
+                    "events": _build_event(
+                        "match_finished",
+                        message="Trận kết thúc hòa do bàn cờ đã đầy.",
+                        side=None,
+                        team_id=None,
+                        payload={"reason": "draw"},
+                    )
+                },
+            },
+        )
+        return await database[MATCHES_COLLECTION].find_one({"_id": match_id})
+
+    x, y = move
+    now = _now_utc()
+    board_cell_path = f"board.{x}.{y}"
+
+    result = await database[MATCHES_COLLECTION].update_one(
+        {
+            "_id": match_id,
+            "status": "playing",
+            "current_turn": bot_side,
+            board_cell_path: 0,
+        },
+        {
+            "$set": {
+                board_cell_path: _side_value(bot_side),
+                f"teams.{bot_side}.last_heartbeat": now,
+                f"teams.{bot_side}.is_connected": True,
+                "updated_at": now,
+            },
+            "$inc": {"rev": 1},
+            "$push": {
+                "history": {"x": x, "y": y, "p": bot_side, "t": now},
+                "events": _build_event(
+                    "move_accepted",
+                    message=f"Đội {bot_side} đi nước ({x}, {y}).",
+                    side=bot_side,
+                    team_id=team_id,
+                    payload={"x": x, "y": y, "is_bot": True},
+                ),
+            },
+        },
+    )
+
+    if result.matched_count == 0:
+        return await database[MATCHES_COLLECTION].find_one({"_id": match_id})
+
+    updated = await database[MATCHES_COLLECTION].find_one({"_id": match_id})
+    updated_board = updated.get("board", [])
+
+    if _check_win(updated_board, x, y, _side_value(bot_side)):
+        await database[MATCHES_COLLECTION].update_one(
+            {"_id": match_id, "status": "playing"},
+            {
+                "$set": {
+                    "status": "finished",
+                    "winner": bot_side,
+                    "finished_at": now,
+                    "finish_reason": "win",
+                    "turn_deadline_at": None,
+                    "updated_at": now,
+                },
+                "$inc": {"rev": 1},
+                "$push": {
+                    "events": {
+                        "$each": [
+                            _build_event(
+                                "win_detected",
+                                message=f"Đội {bot_side} đã tạo 5 quân liên tiếp.",
+                                side=bot_side,
+                                team_id=team_id,
+                            ),
+                            _build_event(
+                                "match_finished",
+                                message=f"Trận kết thúc. Đội {bot_side} chiến thắng.",
+                                side=bot_side,
+                                team_id=team_id,
+                                payload={"reason": "win", "is_bot": True},
+                            ),
+                        ]
+                    }
+                },
+            },
+        )
+    else:
+        next_side = _other_side(bot_side)
+        await database[MATCHES_COLLECTION].update_one(
+            {"_id": match_id, "status": "playing"},
+            {
+                "$set": {
+                    "current_turn": next_side,
+                    "turn_deadline_at": now + timedelta(seconds=settings.MOVE_TIMEOUT_SECONDS),
+                    "updated_at": now,
+                },
+                "$inc": {"rev": 1},
+                "$push": {
+                    "events": _build_event(
+                        "turn_changed",
+                        message=f"Đến lượt đội {next_side}.",
+                        side=next_side,
+                        team_id=updated.get("teams", {}).get(next_side, {}).get("team_id"),
+                    )
+                },
+            },
+        )
+
+    return await database[MATCHES_COLLECTION].find_one({"_id": match_id})
 
 
 async def _apply_turn_timeout_if_needed(match: dict[str, Any]) -> dict[str, Any]:
@@ -306,6 +488,8 @@ async def agent_init(session: dict[str, Any] = Depends(get_agent_session)):
 
     latest = await database[MATCHES_COLLECTION].find_one({"_id": match.get("_id")})
     latest = await _apply_turn_timeout_if_needed(latest)
+    latest = await _play_greedy_bot_turn_if_needed(latest)
+    latest = await _apply_turn_timeout_if_needed(latest)
 
     return {
         "status": "success",
@@ -319,6 +503,8 @@ async def agent_state(session: dict[str, Any] = Depends(get_agent_session)):
     database = get_database()
     side = session["side"]
     match = await database[MATCHES_COLLECTION].find_one({"_id": session["match"].get("_id")})
+    match = await _apply_turn_timeout_if_needed(match)
+    match = await _play_greedy_bot_turn_if_needed(match)
     match = await _apply_turn_timeout_if_needed(match)
 
     return {
@@ -479,6 +665,8 @@ async def agent_move(payload: MoveRequest, session: dict[str, Any] = Depends(get
         )
 
     latest = await database[MATCHES_COLLECTION].find_one({"_id": match_id})
+    latest = await _play_greedy_bot_turn_if_needed(latest)
+    latest = await _apply_turn_timeout_if_needed(latest)
 
     return {
         "status": "success",

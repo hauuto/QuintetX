@@ -116,6 +116,20 @@ client = QuintetXClient("http://127.0.0.1:8000", "T0001padjsl92", "YOUR_API_KEY"
 client.run(next_move)
 ```
 
+## Chuyen board sang NumPy / PyTorch / TensorFlow
+
+`board` tu server la `list[list[int]]` va co the chuyen nhanh sang tensor/array:
+
+```python
+from QuintetX_SDK import QuintetXClient
+
+board_np = QuintetXClient.board_to_numpy(board, dtype="float32")
+board_torch = QuintetXClient.board_to_torch(board, dtype="float32", device="cpu")
+board_tf = QuintetXClient.board_to_tensorflow(board, dtype="float32")
+```
+
+Xem tai lieu day du trong file `SDK_Instruction.md`.
+
 ## File mẫu
 
 Repo có file mẫu `sdk_example_agent.py`.

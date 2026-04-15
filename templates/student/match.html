@@ -43,16 +43,13 @@
                     <div class="relative bg-white shadow-lg border border-gray-300 mx-auto"
                         :style="`width: ${boardPixelSize}px; height: ${boardPixelSize}px; background-size: ${cellSize}px ${cellSize}px; background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);`">
 
-                        <!-- Winning line highlight -->
-                        <template x-if="currentMatch.status === 'finished' && currentMatch.winning_line">
-                            <template x-for="pt in currentMatch.winning_line" :key="pt[0] + '-' + pt[1]">
-                                <div class="absolute bg-yellow-200 opacity-60"
-                                    :style="`left: ${pt[0] * cellSize}px; top: ${pt[1] * cellSize}px; width: ${cellSize}px; height: ${cellSize}px;`">
-                                </div>
-                            </template>
+                        <template x-for="cell in winningCells" :key="`w-${cell.x}-${cell.y}`">
+                            <div class="absolute bg-green-300/80"
+                                :style="`left: ${cell.x * cellSize}px; top: ${cell.y * cellSize}px; width: ${cellSize}px; height: ${cellSize}px;`">
+                            </div>
                         </template>
 
-                        <template x-for="move in currentMatch.history" :key="move.order">
+                        <template x-for="move in visibleHistory" :key="move.order">
                             <div class="absolute flex items-center justify-center"
                                 :style="`left: ${move.x * cellSize}px; top: ${move.y * cellSize}px; width: ${cellSize}px; height: ${cellSize}px;`">
                                 <span class="font-bold text-xs"
@@ -60,6 +57,50 @@
                                     x-text="move.team"></span>
                             </div>
                         </template>
+
+                        <div x-show="highlightedLastMove" class="absolute border-2 border-yellow-400 pointer-events-none"
+                            :style="`left: ${(highlightedLastMove ? highlightedLastMove.x : 0) * cellSize}px; top: ${(highlightedLastMove ? highlightedLastMove.y : 0) * cellSize}px; width: ${cellSize}px; height: ${cellSize}px;`">
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="isPlaybackEnabled" class="h-16 bg-white border-t border-gray-100 flex items-center px-4 space-x-2 shrink-0 z-10 select-none">
+                    <button @click="togglePlay" class="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-700 transition-colors focus:outline-none">
+                        <template x-if="isPlaying">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </template>
+                        <template x-if="!isPlaying">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </template>
+                    </button>
+
+                    <button @click="prevMove" class="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+
+                    <div class="flex-1 mx-2 flex items-center">
+                        <span class="text-xs font-mono text-gray-500 mr-2 w-8 text-right" x-text="currentStep"></span>
+                        <input type="range" min="0" :max="totalSteps" x-model.number="currentStep" @input="seek"
+                            class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#3547E5]">
+                        <span class="text-xs font-mono text-gray-500 ml-2 w-8" x-text="totalSteps"></span>
+                    </div>
+
+                    <button @click="nextMove" class="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+
+                    <div class="h-6 w-px bg-gray-200 mx-2"></div>
+
+                    <div class="relative">
+                        <select x-model="speed" @change="onSpeedChange" class="appearance-none bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold py-1.5 pl-3 pr-8 rounded outline-none focus:border-[#3547E5] cursor-pointer">
+                            <option value="0.5">0.5x</option>
+                            <option value="1">1x</option>
+                            <option value="2">2x</option>
+                            <option value="4">4x</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                            <svg class="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -125,8 +166,8 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
-                                <template x-for="move in currentMatch.history" :key="move.order">
-                                    <tr class="text-xs">
+                                <template x-for="(move, index) in visibleHistory" :key="move.order">
+                                    <tr class="text-xs" :class="{'bg-blue-50/50': index === visibleHistory.length - 1}">
                                         <td class="px-3 py-2 text-gray-500 font-mono" x-text="move.order"></td>
                                         <td class="px-3 py-2 font-bold"
                                             :class="move.team === 'X' ? 'text-[#3547E5]' : 'text-[#E53535]'"
@@ -213,66 +254,101 @@
 
     <template x-if="!loading && !currentMatch">
         <div class="h-full bg-white rounded-xl border border-gray-100 shadow-sm p-6 overflow-y-auto">
-            <h2 class="text-lg font-bold text-gray-900 mb-4">Không có trận đấu hiện tại của nhóm bạn</h2>
+            <template x-if="replayMode">
+                <div class="max-w-xl mx-auto mt-10 bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
+                    <h2 class="text-lg font-bold text-gray-900">Không thể tải replay</h2>
+                    <p class="text-sm text-gray-600 mt-2">Trận đấu này không tồn tại hoặc bạn không có quyền xem.</p>
+                    <a href="/student/history" class="inline-flex mt-4 px-4 py-2 rounded-lg bg-[#3547E5] text-white text-sm font-bold hover:bg-blue-700 transition-colors">Quay lại lịch sử</a>
+                </div>
+            </template>
 
-            <div class="space-y-6">
+            <template x-if="!replayMode">
                 <div>
-                    <h3 class="text-sm font-bold text-gray-500 uppercase mb-3">Đang diễn ra</h3>
-                    <template x-if="otherMatches.current_matches.length === 0">
-                        <p class="text-sm text-gray-400">Không có trận nào.</p>
-                    </template>
-                    <div class="space-y-2">
-                        <template x-for="match in otherMatches.current_matches" :key="match.id">
-                            <div class="border border-gray-100 rounded-lg p-3 flex items-center justify-between">
-                                <div>
-                                    <p class="text-sm font-bold text-gray-900" x-text="match.room_name"></p>
-                                    <p class="text-xs text-gray-500"
-                                        x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
-                                </div>
-                                <span class="text-xs font-bold text-green-600">Đang diễn ra</span>
+                    <h2 class="text-lg font-bold text-gray-900 mb-4">Không có trận đấu hiện tại của nhóm bạn</h2>
+
+                    <div class="mb-6 border border-gray-100 rounded-lg bg-gray-50 p-4">
+                        <div class="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+                            <div class="flex-1">
+                                <p class="text-sm font-bold text-gray-900">Tạo trận với Greedy Bot</p>
+                                <input
+                                    type="text"
+                                    x-model="createBotRoomName"
+                                    placeholder="Tên phòng (tùy chọn)"
+                                    class="mt-2 w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                                >
                             </div>
-                        </template>
+                            <button
+                                @click="createGreedyBotMatch()"
+                                :disabled="isCreatingBotMatch || !canCreateBotMatch"
+                                class="h-10 px-4 rounded-lg bg-[#3547E5] text-white text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <span x-show="!isCreatingBotMatch">Tạo trận với bot</span>
+                                <span x-show="isCreatingBotMatch">Đang tạo...</span>
+                            </button>
+                        </div>
+                        <p x-show="!canCreateBotMatch" class="text-xs font-semibold text-red-500 mt-2">Bạn cần tham gia một nhóm trước khi tạo trận.</p>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div>
+                            <h3 class="text-sm font-bold text-gray-500 uppercase mb-3">Đang diễn ra</h3>
+                            <template x-if="otherMatches.current_matches.length === 0">
+                                <p class="text-sm text-gray-400">Không có trận nào.</p>
+                            </template>
+                            <div class="space-y-2">
+                                <template x-for="match in otherMatches.current_matches" :key="match.id">
+                                    <div class="border border-gray-100 rounded-lg p-3 flex items-center justify-between">
+                                        <div>
+                                            <p class="text-sm font-bold text-gray-900" x-text="match.room_name"></p>
+                                            <p class="text-xs text-gray-500"
+                                                x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
+                                        </div>
+                                        <span class="text-xs font-bold text-green-600">Đang diễn ra</span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-bold text-gray-500 uppercase mb-3">Sắp tới</h3>
+                            <template x-if="otherMatches.upcoming_matches.length === 0">
+                                <p class="text-sm text-gray-400">Không có trận nào.</p>
+                            </template>
+                            <div class="space-y-2">
+                                <template x-for="match in otherMatches.upcoming_matches" :key="match.id">
+                                    <div class="border border-gray-100 rounded-lg p-3 flex items-center justify-between">
+                                        <div>
+                                            <p class="text-sm font-bold text-gray-900" x-text="match.room_name"></p>
+                                            <p class="text-xs text-gray-500"
+                                                x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
+                                        </div>
+                                        <span class="text-xs font-bold text-yellow-600">Sắp tới</span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-bold text-gray-500 uppercase mb-3">Đã xong</h3>
+                            <template x-if="otherMatches.finished_matches.length === 0">
+                                <p class="text-sm text-gray-400">Không có trận nào.</p>
+                            </template>
+                            <div class="space-y-2">
+                                <template x-for="match in otherMatches.finished_matches" :key="match.id">
+                                    <div class="border border-gray-100 rounded-lg p-3 flex items-center justify-between">
+                                        <div>
+                                            <p class="text-sm font-bold text-gray-900" x-text="match.room_name"></p>
+                                            <p class="text-xs text-gray-500"
+                                                x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
+                                        </div>
+                                        <button @click="openReplayMatch(match.id)" class="text-xs font-bold text-[#3547E5] hover:underline">Xem lại</button>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
                     </div>
                 </div>
-
-                <div>
-                    <h3 class="text-sm font-bold text-gray-500 uppercase mb-3">Sắp tới</h3>
-                    <template x-if="otherMatches.upcoming_matches.length === 0">
-                        <p class="text-sm text-gray-400">Không có trận nào.</p>
-                    </template>
-                    <div class="space-y-2">
-                        <template x-for="match in otherMatches.upcoming_matches" :key="match.id">
-                            <div class="border border-gray-100 rounded-lg p-3 flex items-center justify-between">
-                                <div>
-                                    <p class="text-sm font-bold text-gray-900" x-text="match.room_name"></p>
-                                    <p class="text-xs text-gray-500"
-                                        x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
-                                </div>
-                                <span class="text-xs font-bold text-yellow-600">Sắp tới</span>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-
-                <div>
-                    <h3 class="text-sm font-bold text-gray-500 uppercase mb-3">Đã xong</h3>
-                    <template x-if="otherMatches.finished_matches.length === 0">
-                        <p class="text-sm text-gray-400">Không có trận nào.</p>
-                    </template>
-                    <div class="space-y-2">
-                        <template x-for="match in otherMatches.finished_matches" :key="match.id">
-                            <div class="border border-gray-100 rounded-lg p-3 flex items-center justify-between">
-                                <div>
-                                    <p class="text-sm font-bold text-gray-900" x-text="match.room_name"></p>
-                                    <p class="text-xs text-gray-500"
-                                        x-text="`${match.teams.X.name} vs ${match.teams.O.name}`"></p>
-                                </div>
-                                <span class="text-xs font-bold text-gray-500">Kết thúc</span>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-            </div>
+            </template>
         </div>
     </template>
 </div>
@@ -302,6 +378,41 @@
             turnSecondsLeft: null,
             cellSize: 20,
             boardPixelSize: CONFIG.BOARD_SIZE * 20,
+            isCreatingBotMatch: false,
+            createBotRoomName: '',
+            isPlaying: false,
+            speed: '1',
+            playTimerId: null,
+            currentStep: 0,
+            highlightedLastMove: null,
+            winningCells: [],
+
+            get canCreateBotMatch() {
+                return !!(this.myTeam && this.myTeam.id);
+            },
+
+            get isPlaybackEnabled() {
+                return !!(this.currentMatch && (this.replayMode || this.currentMatch.status === 'finished'));
+            },
+
+            get fullHistory() {
+                if (!this.currentMatch || !Array.isArray(this.currentMatch.history)) {
+                    return [];
+                }
+                return this.currentMatch.history;
+            },
+
+            get totalSteps() {
+                return this.fullHistory.length;
+            },
+
+            get visibleHistory() {
+                if (!this.isPlaybackEnabled) {
+                    return this.fullHistory;
+                }
+                const step = Math.max(0, Math.min(this.currentStep, this.totalSteps));
+                return this.fullHistory.slice(0, step);
+            },
 
             get backUrl() {
                 if (this.replayMode) return '/student/history';
@@ -321,19 +432,192 @@
                 return `${v}s`;
             },
 
+            togglePlay() {
+                if (!this.isPlaybackEnabled) {
+                    return;
+                }
+                this.isPlaying = !this.isPlaying;
+                if (this.isPlaying) {
+                    this.startAutoPlay();
+                } else {
+                    this.stopAutoPlay();
+                }
+            },
+
+            startAutoPlay() {
+                this.stopAutoPlay();
+                const speedValue = Math.max(0.25, Number(this.speed) || 1);
+                const intervalMs = Math.max(120, Math.round(1000 / speedValue));
+
+                this.playTimerId = setInterval(() => {
+                    if (!this.isPlaying || !this.isPlaybackEnabled) {
+                        return;
+                    }
+                    if (this.currentStep >= this.totalSteps) {
+                        this.isPlaying = false;
+                        this.stopAutoPlay();
+                        return;
+                    }
+                    this.nextMove();
+                }, intervalMs);
+            },
+
+            stopAutoPlay() {
+                if (this.playTimerId) {
+                    clearInterval(this.playTimerId);
+                    this.playTimerId = null;
+                }
+            },
+
+            onSpeedChange() {
+                if (this.isPlaying) {
+                    this.startAutoPlay();
+                }
+            },
+
+            prevMove() {
+                if (!this.isPlaybackEnabled) {
+                    return;
+                }
+                if (this.currentStep > 0) {
+                    this.currentStep -= 1;
+                }
+                this.updateHighlights();
+            },
+
+            nextMove() {
+                if (!this.isPlaybackEnabled) {
+                    return;
+                }
+                if (this.currentStep < this.totalSteps) {
+                    this.currentStep += 1;
+                }
+                this.updateHighlights();
+            },
+
+            seek() {
+                if (!this.isPlaybackEnabled) {
+                    return;
+                }
+                this.currentStep = Math.max(0, Math.min(Number(this.currentStep) || 0, this.totalSteps));
+                this.updateHighlights();
+            },
+
+            openReplayMatch(matchId) {
+                if (!matchId) return;
+                const normalized = String(matchId);
+                localStorage.setItem('qx_student_view_match', normalized);
+                window.location.href = `/student/match?mode=replay&match_id=${encodeURIComponent(normalized)}`;
+            },
+
+            syncReplayStep(resetToEnd = false) {
+                if (!this.currentMatch) {
+                    this.currentStep = 0;
+                    this.highlightedLastMove = null;
+                    this.winningCells = [];
+                    this.isPlaying = false;
+                    this.stopAutoPlay();
+                    return;
+                }
+
+                if (this.isPlaybackEnabled) {
+                    if (resetToEnd || this.currentStep > this.totalSteps) {
+                        this.currentStep = this.totalSteps;
+                    }
+                } else {
+                    this.currentStep = this.totalSteps;
+                    this.isPlaying = false;
+                    this.stopAutoPlay();
+                }
+
+                this.updateHighlights();
+            },
+
+            updateHighlights() {
+                const moves = this.visibleHistory;
+                this.highlightedLastMove = moves.length ? moves[moves.length - 1] : null;
+                this.winningCells = this.detectWinningCells(moves);
+            },
+
+            detectWinningCells(moves) {
+                if (!this.currentMatch || this.currentMatch.status !== 'finished' || this.currentMatch.finish_reason !== 'win') {
+                    return [];
+                }
+                if (!moves.length) {
+                    return [];
+                }
+
+                const last = moves[moves.length - 1];
+                if (!last || !last.team || this.currentMatch.winner !== last.team) {
+                    return [];
+                }
+
+                const size = Number(CONFIG.BOARD_SIZE) || 40;
+                const board = Array.from({ length: size }, () => Array(size).fill(0));
+                for (const move of moves) {
+                    const x = Number(move.x);
+                    const y = Number(move.y);
+                    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= size || y >= size) {
+                        continue;
+                    }
+                    board[x][y] = move.team === 'X' ? 1 : 2;
+                }
+
+                const value = last.team === 'X' ? 1 : 2;
+                const directions = [[1, 0], [0, 1], [1, 1], [1, -1]];
+                const lx = Number(last.x);
+                const ly = Number(last.y);
+
+                if (!Number.isInteger(lx) || !Number.isInteger(ly)) {
+                    return [];
+                }
+
+                for (const [dx, dy] of directions) {
+                    const cells = [{ x: lx, y: ly }];
+
+                    let step = 1;
+                    while (true) {
+                        const nx = lx + dx * step;
+                        const ny = ly + dy * step;
+                        if (nx < 0 || ny < 0 || nx >= size || ny >= size) break;
+                        if (board[nx][ny] !== value) break;
+                        cells.push({ x: nx, y: ny });
+                        step += 1;
+                    }
+
+                    step = 1;
+                    while (true) {
+                        const nx = lx - dx * step;
+                        const ny = ly - dy * step;
+                        if (nx < 0 || ny < 0 || nx >= size || ny >= size) break;
+                        if (board[nx][ny] !== value) break;
+                        cells.unshift({ x: nx, y: ny });
+                        step += 1;
+                    }
+
+                    if (cells.length >= 5) {
+                        return cells;
+                    }
+                }
+
+                return [];
+            },
+
             async init() {
-                const rawView = localStorage.getItem('qx_view_match');
+                const params = new URLSearchParams(window.location.search);
+                const queryMatchId = (params.get('match_id') || '').trim();
+                const rawView = queryMatchId || localStorage.getItem('qx_student_view_match');
                 if (rawView) {
                     this.replayMode = true;
                     this.replayMatchId = rawView;
-                    localStorage.removeItem('qx_view_match');
+                    localStorage.removeItem('qx_student_view_match');
+
                     await this.loadMatchById(rawView);
                     this.startCountdown();
                     if (!this.currentMatch) {
-                        this.replayMode = false;
-                        this.replayMatchId = null;
-                        await this.loadMyMatchFull();
-                        this.startPolling();
+                        if (window.QXToast && window.QXToast.show) {
+                            window.QXToast.show('Không thể tải replay của trận này.', 'error');
+                        }
                     }
                     return;
                 }
@@ -358,11 +642,11 @@
                     this.lastRev = this.currentMatch ? Number(this.currentMatch.rev) : null;
                     this.updateCountdown();
                     this.handleStatusTransitions();
+                    this.syncReplayStep(true);
                 } catch (error) {
                     this.currentMatch = null;
                     this.myTeam = null;
-                    this.replayMode = false;
-                    this.replayMatchId = null;
+                    this.syncReplayStep(true);
                     if (window.QXToast && window.QXToast.show) {
                         window.QXToast.show(error.message || 'Không thể tải trận đấu.', 'error');
                     }
@@ -488,6 +772,7 @@
                     events: prev.events || [],
                 };
                 this.lastRev = Number(summary.rev);
+                this.syncReplayStep(false);
             },
 
             handleStatusTransitions() {
@@ -519,6 +804,7 @@
                     this.lastRev = this.currentMatch ? Number(this.currentMatch.rev) : null;
                     this.updateCountdown();
                     this.handleStatusTransitions();
+                    this.syncReplayStep(true);
                 } catch (error) {
                     if (window.QXToast && window.QXToast.show) {
                         window.QXToast.show(error.message || 'Không thể tải dữ liệu trận đấu.', 'error');
@@ -553,6 +839,7 @@
                         };
                         this.updateCountdown();
                         this.handleStatusTransitions();
+                        this.syncReplayStep(true);
                         if (this.loading) this.loading = false;
                         return;
                     }
@@ -583,6 +870,34 @@
                     if (this.loading) {
                         this.loading = false;
                     }
+                }
+            },
+
+            async createGreedyBotMatch() {
+                if (this.isCreatingBotMatch || !this.canCreateBotMatch) {
+                    return;
+                }
+
+                this.isCreatingBotMatch = true;
+                try {
+                    const payload = {
+                        room_name: (this.createBotRoomName || '').trim() || null,
+                    };
+
+                    await window.QXApi.matches.createGreedyBotMatch(payload);
+                    this.createBotRoomName = '';
+
+                    if (window.QXToast && window.QXToast.show) {
+                        window.QXToast.show('Đã tạo trận với Greedy Bot.', 'success');
+                    }
+
+                    await this.loadMyMatchFull(false);
+                } catch (error) {
+                    if (window.QXToast && window.QXToast.show) {
+                        window.QXToast.show(error.message || 'Không thể tạo trận với bot.', 'error');
+                    }
+                } finally {
+                    this.isCreatingBotMatch = false;
                 }
             },
         };

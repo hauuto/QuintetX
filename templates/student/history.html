@@ -104,8 +104,9 @@
 
             viewMatch(matchId) {
                 if (!matchId) return;
-                localStorage.setItem('qx_view_match', matchId);
-                window.location.href = '/student/match';
+                const normalized = String(matchId);
+                localStorage.setItem('qx_student_view_match', normalized);
+                window.location.href = `/student/match?mode=replay&match_id=${encodeURIComponent(normalized)}`;
             },
 
             async init() {

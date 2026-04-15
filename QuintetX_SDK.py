@@ -8,7 +8,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 import requests
 
@@ -565,6 +565,60 @@ class QuintetXClient:
     def get_state(self) -> JsonDict:
         """GET /state."""
         return self._get("/state")
+
+    @staticmethod
+    def board_to_numpy(board: Board, *, dtype: str = "int8") -> Any:
+        """Convert SDK board (list[list[int]]) to NumPy ndarray.
+
+        This helper keeps NumPy optional: import happens only when called.
+        """
+        try:
+            import numpy as np
+        except ImportError as exc:
+            raise RuntimeError("NumPy is not installed. Run: pip install numpy") from exc
+
+        np_dtype = getattr(np, dtype, None)
+        if np_dtype is None:
+            raise ValueError(f"Unsupported NumPy dtype: {dtype}")
+
+        return np.asarray(board, dtype=np_dtype)
+
+    @staticmethod
+    def board_to_torch(board: Board, *, dtype: str = "int8", device: str | None = None) -> Any:
+        """Convert SDK board (list[list[int]]) to PyTorch tensor.
+
+        Example dtype values: int8, int32, float32.
+        """
+        try:
+            import torch
+        except ImportError as exc:
+            raise RuntimeError("PyTorch is not installed. Run: pip install torch") from exc
+
+        torch_dtype = getattr(torch, dtype, None)
+        if torch_dtype is None:
+            raise ValueError(f"Unsupported PyTorch dtype: {dtype}")
+
+        tensor = torch.tensor(board, dtype=torch_dtype)
+        if device:
+            tensor = tensor.to(device)
+        return tensor
+
+    @staticmethod
+    def board_to_tensorflow(board: Board, *, dtype: str = "int8") -> Any:
+        """Convert SDK board (list[list[int]]) to TensorFlow tensor.
+
+        Example dtype values: int8, int32, float32.
+        """
+        try:
+            import tensorflow as tf
+        except ImportError as exc:
+            raise RuntimeError("TensorFlow is not installed. Run: pip install tensorflow") from exc
+
+        tf_dtype = getattr(tf, dtype, None)
+        if tf_dtype is None:
+            raise ValueError(f"Unsupported TensorFlow dtype: {dtype}")
+
+        return tf.convert_to_tensor(board, dtype=tf_dtype)
 
     def send_move(self, x: int, y: int) -> JsonDict:
         """POST /move."""

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import os
 import queue
+import re
 import threading
 import time
 import tkinter as tk
@@ -26,22 +28,66 @@ class Solution:
     strategy: Optional[StrategyFunc]
 
 
+_SOLUTION_NAME_RE = re.compile(r"^\s*SOLUTION_NAME\s*=\s*([\"'])(.*?)\1\s*$", re.MULTILINE)
+
+
+def _infer_solution_name(path: Path, source: str) -> str:
+    match = _SOLUTION_NAME_RE.search(source or "")
+    if match:
+        value = (match.group(2) or "").strip()
+        if value:
+            return value
+    return path.stem
+
+
+def _make_error_strategy(path: Path, exc: Exception) -> StrategyFunc:
+    def _raise(_: dict) -> tuple[int, int]:
+        raise RuntimeError(f"Solution failed to load: {path} | {exc}")
+
+    return _raise
+
+
+def _make_error_next_move(path: Path, exc: Exception) -> NextMoveFunc:
+    def _raise(_: Board) -> tuple[int, int]:
+        raise RuntimeError(f"Solution failed to load: {path} | {exc}")
+
+    return _raise
+
+
 def _load_solution(path: Path) -> Solution:
-    namespace: dict = {}
     code = path.read_text(encoding="utf-8")
-    exec(compile(code, str(path), "exec"), namespace, namespace)
+    inferred_name = _infer_solution_name(path, code)
 
-    name = namespace.get("SOLUTION_NAME") or path.stem
-    next_move = namespace.get("next_move") if callable(namespace.get("next_move")) else None
-    strategy = namespace.get("strategy") if callable(namespace.get("strategy")) else None
+    namespace: dict = {
+        "__file__": str(path),
+        "__name__": f"quintetx_solution_{path.stem}",
+    }
 
-    if not next_move and not strategy:
-        raise RuntimeError(f"Solution file must define next_move(board) or strategy(state): {path}")
+    try:
+        exec(compile(code, str(path), "exec"), namespace, namespace)
+        name = namespace.get("SOLUTION_NAME") or inferred_name
+        next_move = namespace.get("next_move") if callable(namespace.get("next_move")) else None
+        strategy = namespace.get("strategy") if callable(namespace.get("strategy")) else None
 
-    return Solution(name=str(name), path=path, next_move=next_move, strategy=strategy)
+        if not next_move and not strategy:
+            raise RuntimeError(f"Solution file must define next_move(board) or strategy(state): {path}")
+
+        return Solution(name=str(name), path=path, next_move=next_move, strategy=strategy)
+    except Exception as exc:
+        # Per requirement: never skip solutions. Show it and fail only when executed.
+        return Solution(
+            name=f"{inferred_name} (error)",
+            path=path,
+            next_move=_make_error_next_move(path, exc),
+            strategy=_make_error_strategy(path, exc),
+        )
 
 
 def discover_solutions(solution_dir: Path) -> list[Solution]:
+    return discover_solutions_safe(solution_dir)
+
+
+def discover_solutions_safe(solution_dir: Path, *, on_error: Callable[[Path, Exception], None] | None = None) -> list[Solution]:
     solution_dir.mkdir(parents=True, exist_ok=True)
     solutions: list[Solution] = []
     for path in sorted(solution_dir.glob("*.py")):
@@ -49,18 +95,53 @@ def discover_solutions(solution_dir: Path) -> list[Solution]:
             continue
         try:
             solutions.append(_load_solution(path))
-        except Exception:
-            # Skip invalid solutions.
+        except Exception as exc:
+            if on_error:
+                on_error(path, exc)
             continue
     return solutions
 
 
+def _resolve_solutions_dirs(*, root_dir: Path, explicit_dir: str | None) -> list[Path]:
+    dirs: list[Path] = []
+
+    def _add(p: Path) -> None:
+        try:
+            resolved = p.expanduser().resolve()
+        except Exception:
+            resolved = p
+        if resolved not in dirs:
+            dirs.append(resolved)
+
+    if explicit_dir:
+        _add(Path(explicit_dir))
+        return dirs
+
+    env_dir = (os.getenv("QUINTETX_SOLUTIONS_DIR") or os.getenv("QX_SOLUTIONS_DIR") or "").strip()
+    if env_dir:
+        _add(Path(env_dir))
+        return dirs
+
+    cwd_solutions = Path.cwd() / "solutions"
+    if cwd_solutions.exists() and cwd_solutions.is_dir():
+        _add(cwd_solutions)
+
+    repo_solutions = root_dir / "solutions"
+    if repo_solutions.exists() and repo_solutions.is_dir():
+        _add(repo_solutions)
+
+    if not dirs:
+        _add(repo_solutions)
+
+    return dirs
+
+
 class GuiApp:
-    def __init__(self, root: tk.Tk, *, root_dir: Path) -> None:
+    def __init__(self, root: tk.Tk, *, root_dir: Path, solutions_dirs: list[Path]) -> None:
         self.root = root
         self.root_dir = root_dir
         self.session_file = self.root_dir / ".quintetx_session.json"
-        self.solutions_dir = self.root_dir / "solutions"
+        self.solutions_dirs = solutions_dirs
 
         self.log_queue: queue.Queue[str] = queue.Queue()
         self.client: QuintetXClient | None = None
@@ -162,12 +243,33 @@ class GuiApp:
         self.root.after(100, self._pump_logs)
 
     def _refresh_solutions(self) -> None:
-        solutions = discover_solutions(self.solutions_dir)
-        self.solutions = {sol.name: sol for sol in solutions}
+        solutions: list[Solution] = []
+        for sol_dir in self.solutions_dirs:
+            try:
+                sols = discover_solutions_safe(sol_dir)
+            except Exception as exc:
+                self._log(f"Cannot scan solutions dir {sol_dir}: {exc}")
+                continue
+            solutions.extend(sols)
+
+        # Ensure unique display names.
+        seen: set[str] = set()
+        final: list[Solution] = []
+        for sol in solutions:
+            display = sol.name
+            if display in seen:
+                display = f"{sol.name} [{sol.path.parent.name}/{sol.path.name}]"
+            seen.add(display)
+            final.append(Solution(name=display, path=sol.path, next_move=sol.next_move, strategy=sol.strategy))
+
+        self.solutions = {sol.name: sol for sol in final}
         names = list(self.solutions.keys())
         self.solution_combo["values"] = names
         if names and not self.solution_var.get():
             self.solution_var.set(names[0])
+        self._log("Solutions dirs:")
+        for d in self.solutions_dirs:
+            self._log(f"- {d}")
 
     def on_login(self) -> None:
         server = self.server_var.get().strip()
@@ -269,12 +371,17 @@ class GuiApp:
 def main() -> None:
     parser = argparse.ArgumentParser(description="QuintetX SDK GUI")
     parser.add_argument("--server-url", default=None)
+    parser.add_argument("--solutions-dir", default=None, help="Folder containing *.py solutions")
     args = parser.parse_args()
 
     root_dir = Path(__file__).resolve().parent
+    solutions_dirs = _resolve_solutions_dirs(
+        root_dir=root_dir,
+        explicit_dir=str(args.solutions_dir).strip() if args.solutions_dir else None,
+    )
 
     root = tk.Tk()
-    app = GuiApp(root, root_dir=root_dir)
+    app = GuiApp(root, root_dir=root_dir, solutions_dirs=solutions_dirs)
     if args.server_url:
         app.server_var.set(args.server_url)
     root.mainloop()

@@ -1,10 +1,12 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from io import BytesIO
+from pathlib import Path
+import zipfile
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi import HTTPException
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from app.api.auth import router as auth_router
@@ -110,6 +112,26 @@ app.include_router(groups_router)
 app.include_router(matches_router)
 app.include_router(metrics_router)
 
+APP_ROOT = Path(__file__).resolve().parent
+SDK_INSTRUCTION_FILE = APP_ROOT / "SDK_Instruction.md"
+SDK_PACKAGE_FILES: tuple[tuple[str, Path], ...] = (
+    ("QuintetX_SDK.py", APP_ROOT / "QuintetX_SDK.py"),
+    ("sdk_run.py", APP_ROOT / "sdk_run.py"),
+    ("sdk_gui.py", APP_ROOT / "sdk_gui.py"),
+    ("sdk_example_agent.py", APP_ROOT / "sdk_example_agent.py"),
+    ("solutions/solution_first_empty.py", APP_ROOT / "solutions" / "solution_first_empty.py"),
+    ("solutions/solution_greedy.py", APP_ROOT / "solutions" / "solution_greedy.py"),
+    ("SDK_Instruction.md", SDK_INSTRUCTION_FILE),
+)
+
+
+def _collect_existing_sdk_files() -> list[tuple[str, Path]]:
+    files: list[tuple[str, Path]] = []
+    for archive_name, file_path in SDK_PACKAGE_FILES:
+        if file_path.exists() and file_path.is_file():
+            files.append((archive_name, file_path))
+    return files
+
 EMPTY_MATCH = {
     "id": "",
     "room_name": "",
@@ -179,6 +201,42 @@ async def student_match(request: Request):
 @app.get("/student/history", response_class=HTMLResponse)
 async def student_history(request: Request):
     return templates.TemplateResponse("student/history.html", {"request": request, "matches": []})
+
+
+@app.get("/student/instructions", response_class=HTMLResponse)
+async def student_instructions(request: Request):
+    return templates.TemplateResponse("student/instructions.html", {"request": request})
+
+
+@app.get("/downloads/sdk/instruction")
+async def download_sdk_instruction() -> FileResponse:
+    if not SDK_INSTRUCTION_FILE.exists():
+        raise HTTPException(status_code=404, detail="SDK_Instruction.md not found")
+
+    return FileResponse(
+        path=SDK_INSTRUCTION_FILE,
+        media_type="text/markdown; charset=utf-8",
+        filename="SDK_Instruction.md",
+    )
+
+
+@app.get("/downloads/sdk/zip")
+async def download_sdk_zip() -> StreamingResponse:
+    sdk_files = _collect_existing_sdk_files()
+    if not sdk_files:
+        raise HTTPException(status_code=404, detail="SDK package files not found")
+
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for archive_name, file_path in sdk_files:
+            archive.write(file_path, arcname=archive_name)
+
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="quintetx_sdk.zip"'},
+    )
 
 @app.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):

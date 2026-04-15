@@ -29,6 +29,13 @@
             });
         },
 
+        async createGreedyBotMatch(payload) {
+            return window.QXApi.request('/api/v1/matches/bot', {
+                method: 'POST',
+                body: JSON.stringify(payload || {}),
+            });
+        },
+
         async getMatchEvents(matchId, limit) {
             const capped = Math.max(1, Math.min(Number(limit || 100), 300));
             return window.QXApi.request(`/api/v1/matches/${matchId}/events?limit=${capped}`);

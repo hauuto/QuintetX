@@ -17,6 +17,8 @@ router = APIRouter(prefix="/api/v1/matches", tags=["matches"])
 
 ACTIVE_MATCH_STATUSES = ["waiting", "playing"]
 DEFAULT_API_KEY_LENGTH = 32
+GREEDY_BOT_TEAM_ID = "T9999GREEDY01"
+GREEDY_BOT_TEAM_NAME = "Greedy Bot"
 
 
 def _ensure_can_view_match(_: dict[str, Any], __: dict[str, Any]) -> bool:
@@ -165,10 +167,17 @@ async def _load_group_name_map(team_ids: set[str]) -> dict[str, str]:
     if not team_ids:
         return {}
 
-    database = get_database()
     group_name_map: dict[str, str] = {}
+    if GREEDY_BOT_TEAM_ID in team_ids:
+        group_name_map[GREEDY_BOT_TEAM_ID] = GREEDY_BOT_TEAM_NAME
+
+    query_ids = [team_id for team_id in team_ids if team_id not in group_name_map]
+    if not query_ids:
+        return group_name_map
+
+    database = get_database()
     async for group in database[GROUPS_COLLECTION].find(
-        {"_id": {"$in": list(team_ids)}},
+        {"_id": {"$in": query_ids}},
         {"_id": 1, "name": 1},
     ):
         group_name_map[group.get("_id")] = group.get("name", "")
@@ -179,10 +188,18 @@ def _ensure_admin(current_user: dict[str, Any]) -> bool:
     return current_user.get("role") == "admin"
 
 
+def _ensure_student(current_user: dict[str, Any]) -> bool:
+    return current_user.get("role") == "student"
+
+
 class CreateMatchRequest(BaseModel):
     x_team_id: str = Field(min_length=1)
     o_team_id: str = Field(min_length=1)
     start_time: str = Field(min_length=1)
+    room_name: str | None = Field(default=None, max_length=200)
+
+
+class CreateGreedyBotMatchRequest(BaseModel):
     room_name: str | None = Field(default=None, max_length=200)
 
 
@@ -334,6 +351,134 @@ async def create_match(payload: CreateMatchRequest, current_user: dict[str, Any]
     }
 
 
+@router.post("/bot")
+async def create_match_with_greedy_bot(
+    payload: CreateGreedyBotMatchRequest,
+    current_user: dict[str, Any] = Depends(get_current_user),
+):
+    if not _ensure_student(current_user):
+        return {
+            "status": "error",
+            "data": {},
+            "message": "Only student can create a match with bot",
+        }
+
+    group_id = str(current_user.get("group_id") or "").strip()
+    if not group_id:
+        return {
+            "status": "error",
+            "data": {},
+            "message": "Bạn chưa thuộc nhóm nào. Hãy tham gia hoặc tạo nhóm trước.",
+        }
+
+    database = get_database()
+    my_group = await database[GROUPS_COLLECTION].find_one({"_id": group_id}, {"_id": 1, "name": 1})
+    if not my_group:
+        return {
+            "status": "error",
+            "data": {},
+            "message": "Nhóm hiện tại không tồn tại.",
+        }
+
+    active_conflict = await database[MATCHES_COLLECTION].find_one(
+        {
+            "status": {"$in": ACTIVE_MATCH_STATUSES},
+            "$or": [
+                {"teams.X.team_id": group_id},
+                {"teams.O.team_id": group_id},
+            ],
+        },
+        {"_id": 1},
+    )
+    if active_conflict:
+        return {
+            "status": "error",
+            "data": {},
+            "message": "Nhóm của bạn đang có một trận đấu đang diễn ra hoặc chờ bắt đầu.",
+        }
+
+    now = _now_utc()
+    room_name = (payload.room_name or "").strip() or f"{my_group.get('name', group_id)} vs {GREEDY_BOT_TEAM_NAME}"
+
+    match_id = await _generate_unique_match_id()
+    my_api_key = _generate_api_key()
+    bot_api_key = _generate_api_key()
+
+    match_doc = {
+        "_id": match_id,
+        "room_name": room_name,
+        "status": "waiting",
+        "rev": 0,
+        "updated_at": now,
+        "board": _create_board(),
+        "teams": {
+            "X": {
+                "team_id": group_id,
+                "api_key": my_api_key,
+                "is_connected": False,
+                "last_heartbeat": None,
+            },
+            "O": {
+                "team_id": GREEDY_BOT_TEAM_ID,
+                "api_key": bot_api_key,
+                "is_connected": True,
+                "last_heartbeat": now,
+            },
+        },
+        "current_turn": "X",
+        "winner": None,
+        "history": [],
+        "events": [
+            {
+                "type": "match_created",
+                "message": "Trận đấu với Greedy Bot đã được tạo.",
+                "side": None,
+                "team_id": None,
+                "payload": {
+                    "created_by": current_user.get("_id"),
+                    "x_team_id": group_id,
+                    "o_team_id": GREEDY_BOT_TEAM_ID,
+                    "mode": "student_vs_greedy_bot",
+                },
+                "created_at": now,
+            }
+        ],
+        "start_time": now,
+        "started_at": None,
+        "finished_at": None,
+        "turn_deadline_at": None,
+        "finish_reason": None,
+        "created_at": now,
+    }
+
+    await database[MATCHES_COLLECTION].insert_one(match_doc)
+
+    created_payload = _build_match_payload(
+        match_doc,
+        {
+            group_id: my_group.get("name", group_id),
+            GREEDY_BOT_TEAM_ID: GREEDY_BOT_TEAM_NAME,
+        },
+        include_board=False,
+        include_history=False,
+        include_events=False,
+    )
+    created_payload["teams"]["X"]["api_key"] = my_api_key
+
+    return {
+        "status": "success",
+        "data": {
+            "match": created_payload,
+            "my_team": {
+                "id": group_id,
+                "side": "X",
+                "api_key": my_api_key,
+            },
+        },
+        "message": "",
+    }
+
+
 @router.get("/overview")
 async def list_matches_overview(current_user: dict[str, Any] = Depends(get_current_user)):
     del current_user
@@ -410,7 +555,7 @@ async def get_my_match(current_user: dict[str, Any] = Depends(get_current_user))
         }
 
     my_match_query = {
-        "status": {"$in": ["waiting", "playing", "finished"]},
+        "status": {"$in": ACTIVE_MATCH_STATUSES},
         "$or": [{"teams.X.team_id": group_id}, {"teams.O.team_id": group_id}],
     }
     my_match = await database[MATCHES_COLLECTION].find_one(
@@ -530,7 +675,7 @@ async def get_my_match_summary(
         }
 
     my_match_query = {
-        "status": {"$in": ["waiting", "playing", "finished"]},
+        "status": {"$in": ACTIVE_MATCH_STATUSES},
         "$or": [{"teams.X.team_id": group_id}, {"teams.O.team_id": group_id}],
     }
 
