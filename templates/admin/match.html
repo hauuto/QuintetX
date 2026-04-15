@@ -278,24 +278,33 @@
 
             async loadLatestMatch() {
                 try {
+                    const params = new URLSearchParams(window.location.search);
+                    const queryMatchId = (params.get('match_id') || '').trim();
+                    const storageMatchId = (localStorage.getItem('qx_view_match') || '').trim();
+                    const viewId = queryMatchId || storageMatchId;
+
+                    localStorage.removeItem('qx_view_match');
+
+                    // Prefer explicit replay target first to avoid falling back to an unrelated match.
+                    if (viewId) {
+                        try {
+                            const fullById = await this.fetchFullMatch(viewId);
+                            if (fullById) {
+                                this.setActiveMatch(fullById);
+                                return;
+                            }
+                        } catch (viewErr) {
+                            console.warn('Cannot load requested match:', viewId, viewErr);
+                        }
+                    }
+
                     const json = await window.QXApi.request('/api/v1/matches/overview', {
                         method: 'GET',
                     });
 
                     const data = json.data || {};
-                    const viewId = localStorage.getItem('qx_view_match');
-                    localStorage.removeItem('qx_view_match');
 
                     let pick = null;
-                    if (viewId) {
-                        const allMatches = [
-                            ...(data.current_matches || []),
-                            ...(data.upcoming_matches || []),
-                            ...(data.finished_matches || [])
-                        ];
-                        pick = allMatches.find(m => m.id === viewId);
-                    }
-
                     if (!pick) {
                         pick = (data.current_matches && data.current_matches[0])
                             || (data.upcoming_matches && data.upcoming_matches[0])
