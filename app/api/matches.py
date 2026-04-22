@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/v1/matches", tags=["matches"])
 
 ACTIVE_MATCH_STATUSES = ["waiting", "playing"]
 DEFAULT_API_KEY_LENGTH = 32
-GREEDY_BOT_TEAM_ID = "T9999GREEDY01"
+GREEDY_BOT_TEAM_ID = "T9999GREEDY02"
 GREEDY_BOT_TEAM_NAME = "Greedy Bot"
 
 
