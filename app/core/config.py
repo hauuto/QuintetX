@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     AUTO_SEED_ON_STARTUP: bool = True
 
     # Server Settings
-    SERVER_HOST: str = "127.0.0.1"
+    SERVER_HOST: str = '0.0.0.0'
     SERVER_PORT: int = 2111
 
     # Game Settings
