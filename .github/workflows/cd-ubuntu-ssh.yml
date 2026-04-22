@@ -97,7 +97,7 @@ jobs:
             --exclude '.mypy_cache/' \
             --exclude '.ruff_cache/' \
             --exclude '.idea/' \
-            ./ "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/"
+            ./ "${SSH_USER}:${DEPLOY_PATH}/"
 
       - name: Install dependencies and run app in tmux
         run: |
