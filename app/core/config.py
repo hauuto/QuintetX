@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     # Server Settings
     SERVER_HOST: str = "127.0.0.1"
-    SERVER_PORT: int = 8000
+    SERVER_PORT: int = 2111
 
     # Game Settings
     BOARD_SIZE: int = 40
