@@ -890,6 +890,32 @@ async def list_my_finished_matches(
     return {"status": "success", "data": {"matches": matches}, "message": ""}
 
 
+@router.delete("/{match_id}")
+async def delete_match(match_id: str, current_user: dict[str, Any] = Depends(get_current_user)):
+    if not _ensure_admin(current_user):
+        return {
+            "status": "error",
+            "data": {},
+            "message": "Only admin can delete matches",
+        }
+
+    database = get_database()
+    delete_result = await database[MATCHES_COLLECTION].delete_one({"_id": match_id})
+
+    if delete_result.deleted_count == 0:
+        return {
+            "status": "error",
+            "data": {},
+            "message": "Match not found",
+        }
+
+    return {
+        "status": "success",
+        "data": {"deleted_match_id": match_id},
+        "message": "",
+    }
+
+
 @router.get("/{match_id}")
 async def get_match_by_id(match_id: str, current_user: dict[str, Any] = Depends(get_current_user)):
     database = get_database()

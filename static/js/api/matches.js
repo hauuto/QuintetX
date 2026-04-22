@@ -45,6 +45,13 @@
             return window.QXApi.request(`/api/v1/matches/${encodeURIComponent(String(matchId || ''))}`);
         },
 
+        async deleteMatch(matchId) {
+            const normalizedId = encodeURIComponent(String(matchId || ''));
+            return window.QXApi.request(`/api/v1/matches/${normalizedId}`, {
+                method: 'DELETE',
+            });
+        },
+
         async getMyHistory(limit) {
             const capped = Math.max(1, Math.min(Number(limit || 50), 200));
             return window.QXApi.request(`/api/v1/matches/my/history?limit=${capped}`);
