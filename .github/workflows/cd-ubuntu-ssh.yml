@@ -23,11 +23,13 @@ jobs:
     name: Deploy to Ubuntu Server
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    environment:
+      name: production
 
     env:
       SSH_HOST: ${{ secrets.SSH_HOST}}
-      SSH_USER: ${{ secrets.SSH_USER}}
-      SSH_PORT: ${{ secrets.SSH_PORT || '1402'}}
+      SSH_USER: ${{ secrets.SSH_USER || 'khoi'}}
+      SSH_PORT: ${{ '1402'}}
       SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY || secrets.SSH_KEY }}
       SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
       DEPLOY_PATH: ${{ secrets.SSH_TARGET_DIR || '/home/khoi/QuintetX/' }}
@@ -85,7 +87,9 @@ jobs:
       - name: Sync source to server
         run: |
           set -euo pipefail
+          # Thêm tham số -e "ssh -p ${SSH_PORT}" để ép rsync dùng đúng cổng
           rsync -az --delete \
+            -e "ssh -p ${SSH_PORT}" \
             --exclude '.git/' \
             --exclude '.github/' \
             --exclude '.venv/' \
@@ -96,7 +100,7 @@ jobs:
             --exclude '.ruff_cache/' \
             --exclude '.idea/' \
             ./ "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/"
-
+            echo "Run on server: ssh -p ${SSH_PORT} ${SSH_USER}@${SSH_HOST} 'ls -la ${DEPLOY_PATH}'"
       - name: Install dependencies and run app in tmux
         run: |
           set -euo pipefail
