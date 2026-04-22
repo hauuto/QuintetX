@@ -202,3 +202,31 @@ QuintetX/
 ├── poetry.lock                # Lockfile của Poetry
 └── README.md                  # Tài liệu dự án
 ```
+
+## CI/CD (GitHub Actions + Ubuntu SSH)
+
+Repo da duoc them 2 workflow:
+
+- `.github/workflows/ci.yml`: chay kiem tra backend cho moi pull request/push.
+- `.github/workflows/cd-ubuntu-ssh.yml`: deploy len server Ubuntu qua SSH sau khi CI branch `main` thanh cong (hoac chay tay).
+
+### GitHub Secrets can tao
+
+Bat buoc:
+
+- `SSH_HOST`: IP/domain cua server Ubuntu.
+- `SSH_USER`: user SSH tren server (vi du `ubuntu`).
+- `SSH_PRIVATE_KEY` hoac `SSH_KEY`: private key dung de SSH (workflow ho tro ca 2 ten).
+
+Tuy chon:
+
+- `SSH_PORT`: cong SSH (mac dinh `22`).
+- `SSH_TARGET_DIR`: thu muc deploy tren server (mac dinh `/home/khoi/QuintetX/`).
+- `TMUX_SESSION`: ten tmux session de chay app (mac dinh `quintetx`).
+
+### Luu y de chay tot tren Ubuntu
+
+- Server can co `python3`, `git`, `rsync`, `ssh`.
+- Workflow se tu cai Poetry neu server chua co.
+- Workflow se khoi dong app ben trong tmux session va su dung lenh `tmux attach-session -t quintetx` (chi attach khi co TTY interactive).
+- Dat `SERVER_HOST=0.0.0.0` trong file `.env` tren server neu can truy cap tu ben ngoai (qua Nginx/reverse proxy).

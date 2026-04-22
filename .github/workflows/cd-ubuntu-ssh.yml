@@ -1,0 +1,112 @@
+name: CD Ubuntu SSH
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Ubuntu Server
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+
+    env:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+      SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY || secrets.SSH_KEY }}
+      DEPLOY_PATH: ${{ secrets.SSH_TARGET_DIR || '/home/khoi/QuintetX/' }}
+      TMUX_SESSION: ${{ secrets.TMUX_SESSION || 'quintetx' }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Validate deploy secrets
+        run: |
+          set -euo pipefail
+          test -n "${SSH_HOST}" || (echo "Missing secret SSH_HOST" && exit 1)
+          test -n "${SSH_USER}" || (echo "Missing secret SSH_USER" && exit 1)
+          test -n "${SSH_KEY}" || (echo "Missing secret SSH_PRIVATE_KEY or SSH_KEY" && exit 1)
+
+      - name: Configure SSH key and host
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${SSH_KEY}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p "${SSH_PORT}" -H "${SSH_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Ensure remote deploy directory exists
+        run: |
+          set -euo pipefail
+          ssh -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" "mkdir -p '${DEPLOY_PATH}'"
+
+      - name: Sync source to server
+        run: |
+          set -euo pipefail
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '.venv/' \
+            --exclude '.venv-*/' \
+            --exclude '__pycache__/' \
+            --exclude '.pytest_cache/' \
+            --exclude '.mypy_cache/' \
+            --exclude '.ruff_cache/' \
+            --exclude '.idea/' \
+            ./ "${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/"
+
+      - name: Install dependencies and run app in tmux
+        run: |
+          set -euo pipefail
+          ssh -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" "
+            set -euo pipefail
+            cd '${DEPLOY_PATH}'
+
+            if ! command -v poetry >/dev/null 2>&1; then
+              curl -sSL https://install.python-poetry.org | python3 -
+            fi
+
+            if ! command -v tmux >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo apt-get install -y tmux
+            fi
+
+            export PATH=\"\$HOME/.local/bin:\$PATH\"
+            poetry install --no-interaction --no-root
+
+            if tmux has-session -t '${TMUX_SESSION}' 2>/dev/null; then
+              tmux send-keys -t '${TMUX_SESSION}' C-c || true
+            else
+              tmux new-session -d -s '${TMUX_SESSION}'
+            fi
+
+            START_CMD=\"cd '${DEPLOY_PATH}' && export PATH=\\\"\$HOME/.local/bin:\$PATH\\\" && poetry run python main.py\"
+            tmux send-keys -t '${TMUX_SESSION}' \"\$START_CMD\" C-m
+
+            if [ -t 1 ]; then
+              tmux attach-session -t '${TMUX_SESSION}'
+            else
+              echo \"tmux attach-session -t ${TMUX_SESSION} (skipped in non-interactive CI)\"
+            fi
+
+            tmux list-sessions | grep -E '^${TMUX_SESSION}:'
+          "
