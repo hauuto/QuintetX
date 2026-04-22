@@ -223,6 +223,7 @@ Tuy chon:
 - `SSH_PORT`: cong SSH (mac dinh `22`).
 - `SSH_TARGET_DIR`: thu muc deploy tren server (mac dinh `/home/khoi/QuintetX/`).
 - `TMUX_SESSION`: ten tmux session de chay app (mac dinh `quintetx`).
+- `SSH_KNOWN_HOSTS`: noi dung known_hosts cho server (khuyen nghi de tranh loi `ssh-keyscan`).
 
 ### Luu y de chay tot tren Ubuntu
 
@@ -230,3 +231,4 @@ Tuy chon:
 - Workflow se tu cai Poetry neu server chua co.
 - Workflow se khoi dong app ben trong tmux session va su dung lenh `tmux attach-session -t quintetx` (chi attach khi co TTY interactive).
 - Dat `SERVER_HOST=0.0.0.0` trong file `.env` tren server neu can truy cap tu ben ngoai (qua Nginx/reverse proxy).
+- Neu server chi truy cap duoc trong LAN/VPN, GitHub-hosted runner se khong ket noi duoc: can dung self-hosted runner trong cung network.

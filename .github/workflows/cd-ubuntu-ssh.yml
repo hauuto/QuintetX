@@ -26,10 +26,11 @@ jobs:
       name: production
 
     env:
-      SSH_HOST: ${{ secrets.SSH_HOST }}
-      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_HOST: ${{ secrets.SSH_HOST}}
+      SSH_USER: ${{ secrets.SSH_USER || khoi}}
       SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
       SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY || secrets.SSH_KEY }}
+      SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
       DEPLOY_PATH: ${{ secrets.SSH_TARGET_DIR || '/home/khoi/QuintetX/' }}
       TMUX_SESSION: ${{ secrets.TMUX_SESSION || 'quintetx' }}
 
@@ -50,9 +51,32 @@ jobs:
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
-          printf '%s\n' "${SSH_KEY}" > ~/.ssh/id_rsa
+          printf '%s\n' "${SSH_KEY}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p "${SSH_PORT}" -H "${SSH_HOST}" >> ~/.ssh/known_hosts
+
+          if [[ "${SSH_HOST}" == *"@"* ]]; then
+            echo "SSH_HOST must be hostname/IP only (without user@)."
+            exit 1
+          fi
+
+          touch ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+          if [ -n "${SSH_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "${SSH_KNOWN_HOSTS}" >> ~/.ssh/known_hosts
+          else
+            if ! ssh-keyscan -T 20 -p "${SSH_PORT}" -H "${SSH_HOST}" >> ~/.ssh/known_hosts 2> /tmp/ssh-keyscan.err; then
+              echo "ssh-keyscan failed for ${SSH_HOST}:${SSH_PORT}."
+              cat /tmp/ssh-keyscan.err || true
+              echo "If server is private LAN/VPN only, use a self-hosted runner or provide SSH_KNOWN_HOSTS secret."
+              exit 1
+            fi
+          fi
+
+      - name: Test SSH connectivity
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o ConnectTimeout=15 -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" "echo SSH connection established"
 
       - name: Ensure remote deploy directory exists
         run: |
