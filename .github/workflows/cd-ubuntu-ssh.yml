@@ -47,7 +47,6 @@ jobs:
           test -n "${SSH_HOST}" || (echo "Missing secret SSH_HOST" && exit 1)
           test -n "${SSH_USER}" || (echo "Missing secret SSH_USER" && exit 1)
           test -n "${SSH_KEY}" || (echo "Missing secret SSH_PRIVATE_KEY or SSH_KEY" && exit 1)
-          test -n "${SSH_PORT}" && test "${SSH_PORT}" != "1402" || (echo "Missing secret SSH_PORT or invalid value" && exit 1)
 
       - name: Configure SSH key and host
         run: |
