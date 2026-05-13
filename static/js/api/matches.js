@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     if (!window.QXApi) {
         window.QXApi = {};
     }
@@ -36,6 +36,20 @@
             });
         },
 
+        async createPlayerRoom(payload) {
+            return window.QXApi.request('/api/v1/matches/player-room', {
+                method: 'POST',
+                body: JSON.stringify(payload || {}),
+            });
+        },
+
+        async joinPlayerRoom(matchId) {
+            const normalizedId = encodeURIComponent(String(matchId || ''));
+            return window.QXApi.request(`/api/v1/matches/${normalizedId}/join`, {
+                method: 'POST',
+            });
+        },
+
         async getMatchEvents(matchId, limit) {
             const capped = Math.max(1, Math.min(Number(limit || 100), 300));
             return window.QXApi.request(`/api/v1/matches/${matchId}/events?limit=${capped}`);
@@ -43,6 +57,14 @@
 
         async getMatch(matchId) {
             return window.QXApi.request(`/api/v1/matches/${encodeURIComponent(String(matchId || ''))}`);
+        },
+
+        async submitMove(matchId, payload) {
+            const normalizedId = encodeURIComponent(String(matchId || ""));
+            return window.QXApi.request(`/api/v1/matches/${normalizedId}/move`, {
+                method: "POST",
+                body: JSON.stringify(payload || {}),
+            });
         },
 
         async deleteMatch(matchId) {
@@ -60,3 +82,6 @@
 
     window.QXApi.matches = matchesApi;
 })();
+
+
+

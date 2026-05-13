@@ -28,25 +28,8 @@
         </div>
 
         <!-- Board Container -->
-        <div class="flex-1 overflow-auto bg-[#F0F2F5] p-4 flex items-center justify-center cursor-move" id="board-container">
-            <!-- 40x40 Grid Canvas/Container -->
-             <div class="relative bg-white shadow-lg border border-gray-300 mx-auto"
-                  :style="`width: ${40 * 20}px; height: ${40 * 20}px; background-size: 20px 20px; background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);`">
-
-                <!-- Pieces (Example Rendering) -->
-                <template x-for="move in history.slice(0, currentStep)" :key="move.order">
-                    <div class="absolute flex items-center justify-center w-5 h-5"
-                         :style="`left: ${move.x * 20}px; top: ${move.y * 20}px;`">
-                        <span class="font-bold text-[10px]"
-                              :class="move.team === 'X' ? 'text-[#3547E5]' : 'text-[#E53535]'"
-                              x-text="move.team"></span>
-                    </div>
-                </template>
-
-                <!-- Last Move Highlight -->
-                <div x-show="lastMove" class="absolute w-5 h-5 border-2 border-yellow-400 pointer-events-none"
-                     :style="`left: ${lastMove ? lastMove.x * 20 : 0}px; top: ${lastMove ? lastMove.y * 20 : 0}px;`"></div>
-            </div>
+        <div class="flex-1 overflow-auto bg-[#F0F2F5] p-4 flex items-center justify-center" id="board-container">
+            <canvas x-ref="boardCanvas" x-effect="renderBoard()" class="bg-white shadow-lg border border-gray-300 mx-auto"></canvas>
         </div>
 
         <!-- Bottom Playback Toolbar -->
@@ -181,6 +164,8 @@
             history: [],
             match: null,
             playTimerId: null,
+            boardRenderer: null,
+            pollTimerId: null,
 
             get lastMove() {
                 if (this.currentStep === 0) return null;
@@ -238,19 +223,56 @@
 
             prevMove() {
                 if (this.currentStep > 0) this.currentStep--;
+                this.renderBoard();
             },
 
             nextMove() {
                 if (this.currentStep < this.totalSteps) this.currentStep++;
+                this.renderBoard();
             },
 
             seek() {
-                // Logic to update board state based on currentStep
+                this.currentStep = Math.max(0, Math.min(Number(this.currentStep) || 0, this.totalSteps));
+                this.renderBoard();
             },
 
             init() {
-                console.log('[AdminMatch] Initialized');
+                this.$nextTick(() => this.initBoardRenderer());
                 this.loadLatestMatch();
+            },
+
+            initBoardRenderer() {
+                if (this.boardRenderer || !this.$refs.boardCanvas || !window.QXBoardCanvas) return;
+                this.boardRenderer = window.QXBoardCanvas.create(this.$refs.boardCanvas, { interactive: false });
+                this.renderBoard();
+            },
+
+            renderBoard() {
+                if (!this.boardRenderer) this.initBoardRenderer();
+                if (!this.boardRenderer) return;
+                this.boardRenderer.setState({
+                    board: this.match ? this.match.board : null,
+                    history: this.history,
+                    currentStep: this.currentStep,
+                    lastMove: this.lastMove,
+                    currentTurn: this.match ? this.match.current_turn : null,
+                    status: this.match ? this.match.status : null,
+                });
+            },
+
+            startPolling() {
+                if (this.pollTimerId) clearInterval(this.pollTimerId);
+                this.pollTimerId = setInterval(async () => {
+                    if (!this.match || this.match.status === 'finished') return;
+                    const atEnd = this.currentStep >= this.totalSteps;
+                    const fresh = await this.fetchFullMatch(this.match.id);
+                    if (!fresh || Number(fresh.rev || 0) === Number(this.match.rev || 0)) return;
+                    this.match = fresh;
+                    this.history = fresh.history || [];
+                    this.totalSteps = this.history.length;
+                    if (atEnd) this.currentStep = this.totalSteps;
+                    this.renderBoard();
+                }, 2000);
             },
 
             setActiveMatch(match) {
@@ -262,12 +284,15 @@
                     this.history = [];
                     this.totalSteps = 0;
                     this.currentStep = 0;
+                    this.renderBoard();
                     return;
                 }
                 this.match = match;
                 this.history = match.history || [];
                 this.totalSteps = (match.history || []).length;
                 this.currentStep = this.totalSteps;
+                this.renderBoard();
+                this.startPolling();
             },
 
             async fetchFullMatch(matchId) {

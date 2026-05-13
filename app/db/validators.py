@@ -144,6 +144,11 @@ MATCHES_SCHEMA_VALIDATOR = {
             "status": {"enum": ["waiting", "playing", "finished"]},
             "rev": {"bsonType": "int", "minimum": 0},
             "updated_at": {"bsonType": ["date", "null"]},
+            "mode": {"enum": ["pvp", "pve_greedy", "ai_vs_ai", "player_room"]},
+            "created_by": {"bsonType": ["string", "null"]},
+            "visibility": {"enum": ["public", "private"]},
+            "owner_group_id": {"bsonType": ["string", "null"], "pattern": REGEX_GROUP_ID},
+            "opponent_group_id": {"bsonType": ["string", "null"], "pattern": REGEX_GROUP_ID},
             "board": {
                 "bsonType": "array",
                 "minItems": 40,
@@ -167,6 +172,16 @@ MATCHES_SCHEMA_VALIDATOR = {
                             "api_key": {"bsonType": "string", "minLength": 1},
                             "is_connected": {"bsonType": "bool"},
                             "last_heartbeat": {"bsonType": ["date", "null"]},
+                            "kind": {"enum": ["team", "human", "bot"]},
+                            "is_bot": {"bsonType": "bool"},
+                            "bot": {
+                                "bsonType": ["object", "null"],
+                                "properties": {
+                                    "type": {"enum": ["greedy"]},
+                                    "name": {"bsonType": "string"},
+                                },
+                                "additionalProperties": False,
+                            },
                         },
                         "additionalProperties": False,
                     },
@@ -178,6 +193,16 @@ MATCHES_SCHEMA_VALIDATOR = {
                             "api_key": {"bsonType": "string", "minLength": 1},
                             "is_connected": {"bsonType": "bool"},
                             "last_heartbeat": {"bsonType": ["date", "null"]},
+                            "kind": {"enum": ["team", "human", "bot"]},
+                            "is_bot": {"bsonType": "bool"},
+                            "bot": {
+                                "bsonType": ["object", "null"],
+                                "properties": {
+                                    "type": {"enum": ["greedy"]},
+                                    "name": {"bsonType": "string"},
+                                },
+                                "additionalProperties": False,
+                            },
                         },
                         "additionalProperties": False,
                     },
@@ -268,3 +293,4 @@ NOTIFICATIONS_SCHEMA_VALIDATOR = {
         "additionalProperties": False,
     }
 }
+

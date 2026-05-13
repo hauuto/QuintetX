@@ -274,6 +274,7 @@ async def admin_teams(request: Request):
             "name": 1,
             "members": 1,
             "created_at": 1,
+            "mode": 1,
         },
     ).sort("created_at", -1).to_list(length=500)
 
@@ -304,6 +305,7 @@ async def admin_rooms(request: Request):
             "status": 1,
             "teams": 1,
             "created_at": 1,
+            "mode": 1,
         },
     ).sort("created_at", -1).to_list(length=300)
 
@@ -327,13 +329,17 @@ async def admin_rooms(request: Request):
         teams = match.get("teams") or {}
         team_x_id = (teams.get("X") or {}).get("team_id")
         team_o_id = (teams.get("O") or {}).get("team_id")
+        team_x = teams.get("X") or {}
+        team_o = teams.get("O") or {}
 
         rooms.append(
             {
                 "id": match.get("_id", ""),
                 "name": match.get("room_name", ""),
-                "team1": group_name_map.get(team_x_id, team_x_id) if team_x_id else None,
-                "team2": group_name_map.get(team_o_id, team_o_id) if team_o_id else None,
+                "mode": match.get("mode") or "pvp",
+                "mode_label": "PvE" if match.get("mode") == "pve_greedy" else ("Player Room" if match.get("mode") == "player_room" else "AI vs AI"),
+                "team1": (team_x.get("bot") or {}).get("name") if team_x.get("is_bot") else (group_name_map.get(team_x_id, team_x_id) if team_x_id else None),
+                "team2": (team_o.get("bot") or {}).get("name") if team_o.get("is_bot") else (group_name_map.get(team_o_id, team_o_id) if team_o_id else None),
                 "status": _map_match_status(match.get("status")),
             }
         )
@@ -458,3 +464,4 @@ if __name__ == "__main__":
         port=settings.SERVER_PORT,
         reload=settings.DEBUG,
     )
+

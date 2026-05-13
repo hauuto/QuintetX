@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
@@ -283,3 +283,4 @@ async def _seed_initial_admin(database: Any) -> None:
         {"$setOnInsert": admin_doc},
         upsert=True,
     )
+

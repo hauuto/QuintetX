@@ -1,4 +1,4 @@
-{% extends "student/base_student.html" %}
+﻿{% extends "student/base_student.html" %}
 
 {% block student_content %}
 <div x-data="studentMatchPage()" x-init="init()" class="h-[calc(100vh-8rem)]">
@@ -25,43 +25,28 @@
                         </a>
                         <div class="flex items-center space-x-2">
                             <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"
-                                :class="currentMatch.status === 'playing' ? 'bg-green-500' : 'bg-gray-500'"></span>
+                                :class="currentMatch && currentMatch.status === 'playing' ? 'bg-green-500' : 'bg-gray-500'"></span>
                             <span class="text-sm font-bold text-gray-900" x-text="statusLabel"></span>
                         </div>
                     </div>
                     <div class="flex items-center gap-4">
                         <div class="text-sm font-mono font-medium text-gray-500"
-                            x-show="currentMatch.status === 'playing'">
+                            x-show="currentMatch && currentMatch.status === 'playing'">
                             <span class="text-gray-900 font-bold" x-text="turnCountdownDisplay"></span>
                         </div>
-                        <div class="text-sm font-semibold text-gray-900" x-text="currentMatch.room_name"></div>
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                                :class="modeBadgeClass"
+                                x-text="modeLabel"></span>
+                            <span x-show="currentMatch" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-50 text-green-700" x-text="turnLabel"></span>
+                            <div class="text-sm font-semibold text-gray-900" x-text="currentMatch ? currentMatch.room_name : ''"></div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="flex-1 overflow-auto bg-[#F0F2F5] p-4 flex items-center justify-center cursor-move"
+                <div class="flex-1 overflow-auto bg-[#F0F2F5] p-4 flex items-center justify-center"
                     id="board-container">
-                    <div class="relative bg-white shadow-lg border border-gray-300 mx-auto"
-                        :style="`width: ${boardPixelSize}px; height: ${boardPixelSize}px; background-size: ${cellSize}px ${cellSize}px; background-image: linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);`">
-
-                        <template x-for="cell in winningCells" :key="`w-${cell.x}-${cell.y}`">
-                            <div class="absolute bg-green-300/80"
-                                :style="`left: ${cell.x * cellSize}px; top: ${cell.y * cellSize}px; width: ${cellSize}px; height: ${cellSize}px;`">
-                            </div>
-                        </template>
-
-                        <template x-for="move in visibleHistory" :key="move.order">
-                            <div class="absolute flex items-center justify-center"
-                                :style="`left: ${move.x * cellSize}px; top: ${move.y * cellSize}px; width: ${cellSize}px; height: ${cellSize}px;`">
-                                <span class="font-bold text-xs"
-                                    :class="move.team === 'X' ? 'text-[#3547E5]' : 'text-[#E53535]'"
-                                    x-text="move.team"></span>
-                            </div>
-                        </template>
-
-                        <div x-show="highlightedLastMove" class="absolute border-2 border-yellow-400 pointer-events-none"
-                            :style="`left: ${(highlightedLastMove ? highlightedLastMove.x : 0) * cellSize}px; top: ${(highlightedLastMove ? highlightedLastMove.y : 0) * cellSize}px; width: ${cellSize}px; height: ${cellSize}px;`">
-                        </div>
-                    </div>
+                    <canvas x-ref="boardCanvas" x-effect="renderBoard()" class="bg-white shadow-lg border border-gray-300 mx-auto"></canvas>
                 </div>
 
                 <div x-show="isPlaybackEnabled" class="h-16 bg-white border-t border-gray-100 flex items-center px-4 space-x-2 shrink-0 z-10 select-none">
@@ -207,7 +192,7 @@
     </template>
 
     <!-- Winner Popup -->
-    <template x-if="currentMatch.status === 'finished' && showingWinnerPopup">
+    <template x-if="currentMatch && currentMatch.status === 'finished' && showingWinnerPopup">
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" x-transition>
             <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center border-t-4"
                 :class="currentMatch.winner === myTeam?.side ? 'border-green-500' : (currentMatch.winner ? 'border-red-500' : 'border-gray-500')">
@@ -266,7 +251,8 @@
                 <div>
                     <h2 class="text-lg font-bold text-gray-900 mb-4">Không có trận đấu hiện tại của nhóm bạn</h2>
 
-                    <div class="mb-6 border border-gray-100 rounded-lg bg-gray-50 p-4">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+                    <div class="border border-purple-100 rounded-xl bg-purple-50/60 p-4">
                         <div class="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
                             <div class="flex-1">
                                 <p class="text-sm font-bold text-gray-900">Tạo trận với Greedy Bot</p>
@@ -369,6 +355,7 @@
             countdownTimerId: null,
             showingWinnerPopup: false,
             lastStatus: null,
+            finishPopupTimerId: null,
             otherMatches: {
                 current_matches: [],
                 upcoming_matches: [],
@@ -386,6 +373,8 @@
             currentStep: 0,
             highlightedLastMove: null,
             winningCells: [],
+            boardRenderer: null,
+            movePending: false,
 
             get canCreateBotMatch() {
                 return !!(this.myTeam && this.myTeam.id);
@@ -417,6 +406,30 @@
             get backUrl() {
                 if (this.replayMode) return '/student/history';
                 return '/student/dashboard';
+            },
+
+            get modeLabel() {
+                const mode = this.currentMatch && this.currentMatch.mode;
+                if (mode === 'pve_greedy') return 'PvE';
+                if (mode === 'player_room') return 'Player Room';
+                return 'AI vs AI';
+            },
+
+            get modeBadgeClass() {
+                const mode = this.currentMatch && this.currentMatch.mode;
+                if (mode === 'pve_greedy') return 'bg-purple-100 text-purple-700';
+                if (mode === 'player_room') return 'bg-blue-100 text-blue-700';
+                return 'bg-gray-100 text-gray-700';
+            },
+
+            get turnLabel() {
+                if (!this.currentMatch) return '';
+                if (this.currentMatch.status === 'waiting') return 'Đang chờ đối thủ';
+                const side = this.currentMatch.current_turn || 'X';
+                if (this.myTeam && this.myTeam.side === side) return `Lượt ${side} · Bạn`;
+                const team = this.currentMatch.teams && this.currentMatch.teams[side];
+                if (team && team.is_bot) return `Lượt ${side} · Greedy Bot`;
+                return `Lượt ${side} · Đối thủ`;
             },
 
             get statusLabel() {
@@ -537,6 +550,51 @@
                 const moves = this.visibleHistory;
                 this.highlightedLastMove = moves.length ? moves[moves.length - 1] : null;
                 this.winningCells = this.detectWinningCells(moves);
+                this.renderBoard();
+            },
+
+            initBoardRenderer() {
+                if (this.boardRenderer || !this.$refs.boardCanvas || !window.QXBoardCanvas) return;
+                this.boardRenderer = window.QXBoardCanvas.create(this.$refs.boardCanvas, {
+                    interactive: true,
+                    onCellClick: (x, y) => this.submitHumanMove(x, y),
+                });
+                this.renderBoard();
+            },
+
+            renderBoard() {
+                if (!this.boardRenderer) this.initBoardRenderer();
+                if (!this.boardRenderer) return;
+                this.boardRenderer.setState({
+                    board: this.currentMatch ? this.currentMatch.board : null,
+                    history: this.visibleHistory,
+                    currentStep: null,
+                    lastMove: this.highlightedLastMove,
+                    winningCells: this.winningCells,
+                    currentTurn: this.currentMatch ? this.currentMatch.current_turn : null,
+                    mySide: this.myTeam ? this.myTeam.side : null,
+                    status: this.currentMatch ? this.currentMatch.status : null,
+                });
+            },
+
+            async submitHumanMove(x, y) {
+                if (this.movePending || this.replayMode || !this.currentMatch || !this.myTeam) return;
+                if (this.currentMatch.status !== 'playing' || this.currentMatch.current_turn !== this.myTeam.side) return;
+                this.movePending = true;
+                try {
+                    const result = await window.QXApi.matches.submitMove(this.currentMatch.id, { x, y });
+                    this.currentMatch = (result.data || {}).match || this.currentMatch;
+                    this.lastRev = this.currentMatch ? Number(this.currentMatch.rev) : null;
+                    this.updateCountdown();
+                    this.handleStatusTransitions();
+                    this.syncReplayStep(true);
+                } catch (error) {
+                    if (window.QXToast && window.QXToast.show) {
+                        window.QXToast.show(error.message || 'Không thể gửi nước đi.', 'error');
+                    }
+                } finally {
+                    this.movePending = false;
+                }
             },
 
             detectWinningCells(moves) {
@@ -604,6 +662,7 @@
             },
 
             async init() {
+                this.$nextTick(() => this.initBoardRenderer());
                 const params = new URLSearchParams(window.location.search);
                 const queryMatchId = (params.get('match_id') || '').trim();
                 const rawView = queryMatchId || localStorage.getItem('qx_student_view_match');
@@ -778,11 +837,13 @@
             handleStatusTransitions() {
                 if (this.currentMatch) {
                     if (this.lastStatus && this.lastStatus !== 'finished' && this.currentMatch.status === 'finished') {
-                        this.showingWinnerPopup = true;
+                        if (this.finishPopupTimerId) clearTimeout(this.finishPopupTimerId);
+                        this.finishPopupTimerId = setTimeout(() => { this.showingWinnerPopup = true; this.finishPopupTimerId = null; }, 1200);
                     }
                     this.lastStatus = this.currentMatch.status;
                 } else {
                     this.lastStatus = null;
+                    if (this.finishPopupTimerId) { clearTimeout(this.finishPopupTimerId); this.finishPopupTimerId = null; }
                     this.showingWinnerPopup = false;
                 }
             },
@@ -846,7 +907,9 @@
 
                     // If match id changed (new match created), refresh full.
                     if (!this.currentMatch || this.currentMatch.id !== summaryMatch.id) {
+                        if (!this.currentMatch) {
                         await this.loadMyMatchFull(false);
+                    }
                         if (this.loading) this.loading = false;
                         return;
                     }
@@ -873,6 +936,44 @@
                 }
             },
 
+            async joinPlayerRoom(matchId) {
+                try {
+                    const result = await window.QXApi.matches.joinPlayerRoom(matchId);
+                    const data = result.data || {};
+                    this.currentMatch = data.match || null;
+                    this.myTeam = data.my_team || this.myTeam;
+                    this.lastRev = this.currentMatch ? Number(this.currentMatch.rev) : null;
+                    this.syncReplayStep(true);
+                    this.$nextTick(() => this.renderBoard());
+                    if (window.QXToast && window.QXToast.show) window.QXToast.show('Đã tham gia phòng.', 'success');
+                } catch (error) {
+                    if (window.QXToast && window.QXToast.show) window.QXToast.show(error.message || 'Không thể tham gia phòng.', 'error');
+                }
+            },
+
+            async createPlayerRoom() {
+                if (this.isCreatingPlayerRoom || !this.canCreateBotMatch) return;
+                this.isCreatingPlayerRoom = true;
+                try {
+                    const result = await window.QXApi.matches.createPlayerRoom({
+                        room_name: (this.createRoomName || '').trim() || null,
+                        visibility: this.createRoomVisibility || 'public',
+                    });
+                    const data = result.data || {};
+                    this.currentMatch = data.match || null;
+                    this.myTeam = data.my_team || this.myTeam;
+                    this.lastRev = this.currentMatch ? Number(this.currentMatch.rev) : null;
+                    this.createRoomName = '';
+                    this.syncReplayStep(true);
+                    this.$nextTick(() => this.renderBoard());
+                    if (window.QXToast && window.QXToast.show) window.QXToast.show('Đã tạo phòng chơi.', 'success');
+                } catch (error) {
+                    if (window.QXToast && window.QXToast.show) window.QXToast.show(error.message || 'Không thể tạo phòng.', 'error');
+                } finally {
+                    this.isCreatingPlayerRoom = false;
+                }
+            },
+
             async createGreedyBotMatch() {
                 if (this.isCreatingBotMatch || !this.canCreateBotMatch) {
                     return;
@@ -884,14 +985,19 @@
                         room_name: (this.createBotRoomName || '').trim() || null,
                     };
 
-                    await window.QXApi.matches.createGreedyBotMatch(payload);
+                    const result = await window.QXApi.matches.createGreedyBotMatch(payload);
+                    const data = result.data || {};
+                    this.currentMatch = data.match || null;
+                    this.myTeam = data.my_team || this.myTeam;
+                    this.lastRev = this.currentMatch ? Number(this.currentMatch.rev) : null;
                     this.createBotRoomName = '';
+                    this.updateCountdown();
+                    this.syncReplayStep(true);
+                    this.$nextTick(() => this.renderBoard());
 
                     if (window.QXToast && window.QXToast.show) {
                         window.QXToast.show('Đã tạo trận với Greedy Bot.', 'success');
                     }
-
-                    await this.loadMyMatchFull(false);
                 } catch (error) {
                     if (window.QXToast && window.QXToast.show) {
                         window.QXToast.show(error.message || 'Không thể tạo trận với bot.', 'error');
@@ -904,3 +1010,4 @@
     }
 </script>
 {% endblock %}
+

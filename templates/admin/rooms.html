@@ -32,7 +32,12 @@
                 {% for room in rooms %}
                 <tr class="hover:bg-gray-50 transition-colors">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">#{{ room.id }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ room.name }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <div class="flex items-center gap-2">
+                            <span>{{ room.name }}</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase {% if room.mode == 'pve_greedy' %}bg-purple-100 text-purple-700{% else %}bg-gray-100 text-gray-700{% endif %}">{{ room.mode_label }}</span>
+                        </div>
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {% if room.team1 %}
                         <div class="flex items-center">
@@ -139,6 +144,7 @@
                 <button @click="closeCreateModal()" class="px-4 py-2 text-sm font-bold text-gray-700 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors">
                     Hủy
                 </button>
+                <button @click="submitCreateBotMatch()" :disabled="isCreating" class="px-4 py-2 text-sm font-bold text-[#3547E5] bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Tạo PvE</button>
                 <button @click="submitCreateMatch()" :disabled="isCreating" class="px-4 py-2 text-sm font-bold text-white bg-[#3547E5] hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                     <span x-show="!isCreating">Tạo</span>
                     <span x-show="isCreating">Đang tạo...</span>
@@ -345,6 +351,31 @@
                 return true;
             },
 
+
+
+            async submitCreateBotMatch() {
+                this.createErrors = { x_team_id: '', o_team_id: '', start_time: '', room_name: '', general: '' };
+                if (!this.createForm.x_team_id) {
+                    this.createErrors.x_team_id = 'Vui lòng chọn đội người chơi';
+                    return;
+                }
+                this.isCreating = true;
+                try {
+                    const json = await window.QXApi.matches.createGreedyBotMatch({
+                        human_team_id: this.createForm.x_team_id,
+                        human_side: 'X',
+                        room_name: this.createForm.room_name || null,
+                    });
+                    this.createdMatch = json.data.match;
+                    this.showCreateModal = false;
+                    this.showSuccessModal = true;
+                } catch (error) {
+                    console.error('Error creating PvE match:', error);
+                    this.createErrors.general = 'Lỗi hệ thống: ' + error.message;
+                } finally {
+                    this.isCreating = false;
+                }
+            },
             async submitCreateMatch() {
                 if (!this.validateCreateForm()) return;
 
