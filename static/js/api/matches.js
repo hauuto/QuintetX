@@ -67,6 +67,13 @@
             });
         },
 
+        async surrenderMatch(matchId) {
+            const normalizedId = encodeURIComponent(String(matchId || ""));
+            return window.QXApi.request(`/api/v1/matches/${normalizedId}/surrender`, {
+                method: "POST",
+            });
+        },
+
         async deleteMatch(matchId) {
             const normalizedId = encodeURIComponent(String(matchId || ''));
             return window.QXApi.request(`/api/v1/matches/${normalizedId}`, {

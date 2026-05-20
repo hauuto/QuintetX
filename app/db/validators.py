@@ -246,6 +246,18 @@ MATCHES_SCHEMA_VALIDATOR = {
             "finished_at": {"bsonType": ["date", "null"]},
             "turn_deadline_at": {"bsonType": ["date", "null"]},
             "finish_reason": {"bsonType": ["string", "null"]},
+            "winning_cells": {
+                "bsonType": "array",
+                "items": {
+                    "bsonType": "object",
+                    "required": ["x", "y"],
+                    "properties": {
+                        "x": {"bsonType": "int", "minimum": 0, "maximum": 39},
+                        "y": {"bsonType": "int", "minimum": 0, "maximum": 39},
+                    },
+                    "additionalProperties": False,
+                },
+            },
             "created_at": {"bsonType": "date"},
         },
         "additionalProperties": False,

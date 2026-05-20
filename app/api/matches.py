@@ -12,7 +12,7 @@ from app.api.deps import get_current_user
 from app.core.config import settings
 from app.db.client import get_database
 from app.db.init_db import GROUPS_COLLECTION, MATCHES_COLLECTION
-from app.services.match_engine import advance_match, apply_move, build_event, now_utc, to_iso as engine_to_iso
+from app.services.match_engine import advance_match, apply_move, build_event, now_utc, surrender_match, to_iso as engine_to_iso
 
 router = APIRouter(prefix="/api/v1/matches", tags=["matches"])
 
@@ -118,6 +118,7 @@ def _build_match_payload(
         "current_turn": match.get("current_turn"),
         "winner": match.get("winner"),
         "finish_reason": match.get("finish_reason"),
+        "winning_cells": match.get("winning_cells") or [],
         "rev": int(match.get("rev") or 0),
         "start_time": _to_iso(match.get("start_time")),
         "started_at": _to_iso(match.get("started_at")),
@@ -522,6 +523,40 @@ async def submit_human_move(
     return {"status": "success", "data": {"match": _build_match_payload(updated, group_name_map, include_board=True, include_history=True, include_events=True)}, "message": ""}
 
 
+@router.post("/{match_id}/surrender")
+async def surrender_current_match(
+    match_id: str,
+    current_user: dict[str, Any] = Depends(get_current_user),
+):
+    database = get_database()
+    match = await database[MATCHES_COLLECTION].find_one({"_id": match_id})
+    if not match:
+        return {"status": "error", "data": {}, "message": "Match not found"}
+
+    teams = match.get("teams", {})
+    side = None
+    role = current_user.get("role")
+    if role == "student":
+        group_id = str(current_user.get("group_id") or "")
+        side = "X" if teams.get("X", {}).get("team_id") == group_id else "O" if teams.get("O", {}).get("team_id") == group_id else None
+    elif role == "admin":
+        side = str(match.get("current_turn") or "X")
+    else:
+        return {"status": "error", "data": {}, "message": "Forbidden"}
+
+    if side not in ("X", "O"):
+        return {"status": "error", "data": {}, "message": "Forbidden"}
+
+    updated, error = await surrender_match(match_id, side, team_id=teams.get(side, {}).get("team_id"))
+    if error:
+        return {"status": "error", "data": {}, "message": error}
+
+    updated_teams = updated.get("teams", {}) if updated else teams
+    group_ids = {updated_teams.get("X", {}).get("team_id", ""), updated_teams.get("O", {}).get("team_id", "")}
+    group_ids.discard("")
+    group_name_map = await _load_group_name_map(group_ids)
+    return {"status": "success", "data": {"match": _build_match_payload(updated, group_name_map, include_board=True, include_history=True, include_events=True)}, "message": ""}
+
 
 @router.post("/player-room")
 async def create_player_room(payload: CreatePlayerRoomRequest, current_user: dict[str, Any] = Depends(get_current_user)):
@@ -686,6 +721,18 @@ async def get_my_match(current_user: dict[str, Any] = Depends(get_current_user))
     )
 
     if my_match:
+        my_match = await advance_match(my_match)
+        if not my_match or my_match.get("status") not in ACTIVE_MATCH_STATUSES:
+            overview = await list_matches_overview(current_user)
+            return {
+                "status": "success",
+                "data": {
+                    "my_current_match": _build_match_payload(my_match, await _load_group_name_map({my_match.get("teams", {}).get("X", {}).get("team_id", ""), my_match.get("teams", {}).get("O", {}).get("team_id", "")}), include_board=True, include_history=True, include_events=True) if my_match else None,
+                    "my_team": {"id": group_id},
+                    "other_matches": overview.get("data", {}),
+                },
+                "message": "",
+            }
         team_ids = {
             my_match.get("teams", {}).get("X", {}).get("team_id", ""),
             my_match.get("teams", {}).get("O", {}).get("team_id", ""),
@@ -814,6 +861,10 @@ async def get_my_match_summary(
         "created_at": 1,
         "rev": 1,
         "teams": 1,
+        "board": 1,
+        "history": 1,
+        "events": 1,
+        "winning_cells": 1,
     }
 
     my_match = await database[MATCHES_COLLECTION].find_one(
@@ -821,6 +872,8 @@ async def get_my_match_summary(
         projection,
         sort=[("created_at", -1)],
     )
+    if my_match:
+        my_match = await advance_match(my_match)
 
     if not my_match:
         return {

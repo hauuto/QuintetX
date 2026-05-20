@@ -57,9 +57,9 @@ def build_event(
     }
 
 
-def check_win(board: list[list[int]], x: int, y: int, value: int) -> bool:
+def find_winning_cells(board: list[list[int]], x: int, y: int, value: int) -> list[dict[str, int]]:
     for dx, dy in [(1, 0), (0, 1), (1, 1), (1, -1)]:
-        count = 1
+        cells = [{"x": x, "y": y}]
         step = 1
         while True:
             nx = x + dx * step
@@ -68,7 +68,7 @@ def check_win(board: list[list[int]], x: int, y: int, value: int) -> bool:
                 break
             if board[nx][ny] != value:
                 break
-            count += 1
+            cells.append({"x": nx, "y": ny})
             step += 1
 
         step = 1
@@ -79,12 +79,16 @@ def check_win(board: list[list[int]], x: int, y: int, value: int) -> bool:
                 break
             if board[nx][ny] != value:
                 break
-            count += 1
+            cells.insert(0, {"x": nx, "y": ny})
             step += 1
 
-        if count >= 5:
-            return True
-    return False
+        if len(cells) >= 5:
+            return cells
+    return []
+
+
+def check_win(board: list[list[int]], x: int, y: int, value: int) -> bool:
+    return bool(find_winning_cells(board, x, y, value))
 
 
 def is_bot_side(match: dict[str, Any], side: str) -> bool:
@@ -245,7 +249,8 @@ async def apply_move(
 
     updated = await database[MATCHES_COLLECTION].find_one({"_id": match_id})
     board = updated.get("board", [])
-    if check_win(board, x, y, side_value(side)):
+    winning_cells = find_winning_cells(board, x, y, side_value(side))
+    if winning_cells:
         await database[MATCHES_COLLECTION].update_one(
             {"_id": match_id, "status": "playing"},
             {
@@ -254,6 +259,7 @@ async def apply_move(
                     "winner": side,
                     "finished_at": current,
                     "finish_reason": "win",
+                    "winning_cells": winning_cells,
                     "turn_deadline_at": None,
                     "updated_at": current,
                 },
@@ -266,13 +272,14 @@ async def apply_move(
                                 message=f"Đội {side} đã tạo 5 quân liên tiếp.",
                                 side=side,
                                 team_id=team_id,
+                                payload={"winning_cells": winning_cells},
                             ),
                             build_event(
                                 "match_finished",
                                 message=f"Trận kết thúc. Đội {side} chiến thắng.",
                                 side=side,
                                 team_id=team_id,
-                                payload={"reason": "win", **({"is_bot": True} if is_bot else {})},
+                                payload={"reason": "win", "winning_cells": winning_cells, **({"is_bot": True} if is_bot else {})},
                             ),
                         ]
                     }
@@ -302,6 +309,117 @@ async def apply_move(
         )
 
     return await database[MATCHES_COLLECTION].find_one({"_id": match_id}), None
+
+
+async def surrender_match(match_id: str, side: str, *, team_id: str | None = None) -> tuple[dict[str, Any] | None, str | None]:
+    if side not in ("X", "O"):
+        return None, "Invalid side"
+
+    database = get_database()
+    match = await database[MATCHES_COLLECTION].find_one({"_id": match_id})
+    if not match:
+        return None, "Match not found"
+    if match.get("status") not in ("waiting", "playing"):
+        return match, "Match is already finished"
+
+    current = now_utc()
+    winner_side = other_side(side)
+    result = await database[MATCHES_COLLECTION].update_one(
+        {"_id": match_id, "status": {"$in": ["waiting", "playing"]}},
+        {
+            "$set": {
+                "status": "finished",
+                "winner": winner_side,
+                "finished_at": current,
+                "finish_reason": "surrender",
+                "turn_deadline_at": None,
+                "updated_at": current,
+            },
+            "$inc": {"rev": 1},
+            "$push": {
+                "events": {
+                    "$each": [
+                        build_event(
+                            "match_surrendered",
+                            message=f"Đội {side} đã đầu hàng.",
+                            side=side,
+                            team_id=team_id,
+                            payload={"winner": winner_side},
+                        ),
+                        build_event(
+                            "match_finished",
+                            message=f"Trận kết thúc. Đội {winner_side} chiến thắng do đối thủ đầu hàng.",
+                            side=winner_side,
+                            team_id=match.get("teams", {}).get(winner_side, {}).get("team_id"),
+                            payload={"reason": "surrender", "surrendered_side": side},
+                        ),
+                    ]
+                }
+            },
+        },
+    )
+    if result.matched_count == 0:
+        return await database[MATCHES_COLLECTION].find_one({"_id": match_id}), "Match is already finished"
+    return await database[MATCHES_COLLECTION].find_one({"_id": match_id}), None
+
+
+async def finish_existing_win_if_needed(match: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not match or match.get("status") != "playing":
+        return match
+
+    board = match.get("board", [])
+    history = match.get("history", []) or []
+    for move in reversed(history):
+        side = move.get("p")
+        if side not in ("X", "O"):
+            continue
+        x = move.get("x")
+        y = move.get("y")
+        if not isinstance(x, int) or not isinstance(y, int):
+            continue
+        winning_cells = find_winning_cells(board, x, y, side_value(side))
+        if not winning_cells:
+            continue
+
+        current = now_utc()
+        database = get_database()
+        await database[MATCHES_COLLECTION].update_one(
+            {"_id": match.get("_id"), "status": "playing"},
+            {
+                "$set": {
+                    "status": "finished",
+                    "winner": side,
+                    "finished_at": current,
+                    "finish_reason": "win",
+                    "winning_cells": winning_cells,
+                    "turn_deadline_at": None,
+                    "updated_at": current,
+                },
+                "$inc": {"rev": 1},
+                "$push": {
+                    "events": {
+                        "$each": [
+                            build_event(
+                                "win_detected",
+                                message=f"Đội {side} đã tạo 5 quân liên tiếp.",
+                                side=side,
+                                team_id=match.get("teams", {}).get(side, {}).get("team_id"),
+                                payload={"winning_cells": winning_cells},
+                            ),
+                            build_event(
+                                "match_finished",
+                                message=f"Trận kết thúc. Đội {side} chiến thắng.",
+                                side=side,
+                                team_id=match.get("teams", {}).get(side, {}).get("team_id"),
+                                payload={"reason": "win", "winning_cells": winning_cells},
+                            ),
+                        ]
+                    }
+                },
+            },
+        )
+        return await database[MATCHES_COLLECTION].find_one({"_id": match.get("_id")})
+    return match
 
 
 async def play_greedy_bot_turn_if_needed(match: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -347,8 +465,10 @@ async def play_greedy_bot_turn_if_needed(match: dict[str, Any] | None) -> dict[s
 
 
 async def advance_match(match: dict[str, Any] | None) -> dict[str, Any] | None:
+    match = await finish_existing_win_if_needed(match)
     match = await apply_turn_timeout_if_needed(match)
     match = await play_greedy_bot_turn_if_needed(match)
+    match = await finish_existing_win_if_needed(match)
     match = await apply_turn_timeout_if_needed(match)
     return match
 

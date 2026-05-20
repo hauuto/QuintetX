@@ -1,138 +1,150 @@
-﻿{% extends "student/base_student.html" %}
+{% extends "student/base_student.html" %}
+{% import "student/components/ui.html" as ui %}
 
 {% block student_content %}
-<div
-    class="w-full max-w-7xl mx-auto space-y-8"
-    x-data="studentDashboard()"
-    x-init="initPage()"
->
-    <div>
-        <h1 class="text-2xl font-bold text-gray-900 relative inline-block">
-            Tổng quan
-            <span class="absolute -bottom-1 left-0 w-1/3 h-1 bg-[#3547E5] rounded-full"></span>
-        </h1>
-    </div>
+<div class="mx-auto w-full max-w-7xl space-y-8" x-data="studentDashboard()" x-init="initPage()">
+    {{ ui.page_header('Tổng quan AI Arena', 'Theo dõi hiệu suất đội, trạng thái thi đấu và các bước tiếp theo để chạy bot QuintetX.') }}
 
-    <p x-show="errorMessage" x-cloak class="text-sm font-semibold text-red-600" x-text="errorMessage"></p>
+    <template x-if="errorMessage">
+        <div class="rounded-3xl border border-red-200 bg-red-50 p-5 text-sm text-red-800 shadow-sm">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="font-semibold" x-text="errorMessage"></p>
+                <button @click="initPage" class="inline-flex items-center justify-center rounded-xl bg-red-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-800 focus:outline-none focus:ring-4 focus:ring-red-100">Thử lại</button>
+            </div>
+        </div>
+    </template>
 
-    <div x-show="loading" x-cloak class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-gray-600">
-        Đang tải dữ liệu tổng quan...
-    </div>
+    <template x-if="loading">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {{ ui.skeleton_card() }}
+            {{ ui.skeleton_card() }}
+            {{ ui.skeleton_card() }}
+            {{ ui.skeleton_card() }}
+        </div>
+    </template>
 
     <template x-if="!loading">
         <div class="space-y-8">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Tổng trận đấu</p>
-                        <p class="text-3xl font-bold text-gray-900 mt-2" x-text="statsData.matches"></p>
-                    </div>
-                    <div class="p-3 bg-blue-50 rounded-full text-[#3547E5]">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                        </svg>
-                    </div>
-                </div>
-
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Thắng</p>
-                        <p class="text-3xl font-bold text-gray-900 mt-2" x-text="statsData.wins"></p>
-                    </div>
-                    <div class="p-3 bg-green-50 rounded-full text-green-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                </div>
-
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-500 uppercase tracking-wider">Thua</p>
-                        <p class="text-3xl font-bold text-gray-900 mt-2" x-text="statsData.losses"></p>
-                    </div>
-                    <div class="p-3 bg-red-50 rounded-full text-red-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Thông tin đội</h2>
-
-                <template x-if="teamData">
-                    <div>
-                        <div class="flex items-start justify-between">
+            <section class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <template x-for="card in statCards" :key="card.label">
+                    <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                        <div class="flex items-start justify-between gap-4">
                             <div>
-                                <p class="text-sm text-gray-500 mb-1">Tên đội</p>
-                                <p class="text-xl font-bold text-[#3547E5]" x-text="teamData.name"></p>
+                                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400" x-text="card.label"></p>
+                                <p class="mt-3 text-4xl font-black tracking-tight text-slate-950" x-text="card.value"></p>
+                                <p class="mt-2 text-sm text-slate-500" x-text="card.description"></p>
                             </div>
-                            <div class="text-right">
-                                <p class="text-sm text-gray-500 mb-1">Mã đội</p>
-                                <p class="text-lg font-mono font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded" x-text="teamData.id"></p>
-                            </div>
+                            <div class="flex h-12 w-12 items-center justify-center rounded-2xl" :class="card.iconClass" x-html="card.icon"></div>
                         </div>
-                        <div class="mt-6">
-                            <p class="text-sm text-gray-500 mb-3">Thành viên</p>
+                    </div>
+                </template>
+            </section>
+
+            <section class="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Thông tin đội</p>
+                            <template x-if="teamData">
+                                <div class="mt-3">
+                                    <h2 class="text-2xl font-black text-slate-950" x-text="teamData.name"></h2>
+                                    <p class="mt-2 max-w-xl text-sm text-slate-500" x-text="teamData.description || 'Đội thi đấu AI Gomoku trên QuintetX.'"></p>
+                                </div>
+                            </template>
+                            <template x-if="!teamData">
+                                <div class="mt-3">
+                                    <h2 class="text-2xl font-black text-slate-950">Bạn chưa có đội</h2>
+                                    <p class="mt-2 text-sm text-slate-500">Tạo hoặc tham gia một đội để bắt đầu chạy bot và thi đấu.</p>
+                                </div>
+                            </template>
+                        </div>
+                        <template x-if="teamData">
+                            <button @click="copyText(teamData.group_code || teamData.id, 'Đã sao chép mã đội')" class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-white hover:shadow-sm focus:outline-none focus:ring-4 focus:ring-blue-100">
+                                <span class="font-mono" x-text="teamData.group_code || teamData.id"></span>
+                            </button>
+                        </template>
+                    </div>
+
+                    <template x-if="teamData">
+                        <div class="mt-6 flex flex-wrap items-center gap-4">
                             <div class="flex -space-x-2">
                                 <template x-for="member in (teamData.members || [])" :key="member.user_id">
-                                    <div
-                                        class="w-10 h-10 rounded-full bg-gray-300 border-2 border-white flex items-center justify-center text-xs font-bold text-gray-600"
-                                        :title="member.full_name"
-                                        x-text="toInitials(member.full_name)"
-                                    ></div>
+                                    <div class="flex h-10 w-10 items-center justify-center rounded-2xl border-2 border-white bg-blue-50 text-xs font-black text-blue-700" :title="member.full_name" x-text="toInitials(member.full_name)"></div>
                                 </template>
                             </div>
+                            <p class="text-sm font-semibold text-slate-600"><span x-text="(teamData.members || []).length"></span> thành viên</p>
+                            <a href="/student/team" class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100">Quản lý đội</a>
                         </div>
+                    </template>
+                    <template x-if="!teamData">
+                        <a href="/student/team" class="mt-6 inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100">Tạo hoặc tham gia đội</a>
+                    </template>
+                </div>
+
+                <div class="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-600 to-indigo-600 p-6 text-white shadow-sm">
+                    <p class="text-xs font-bold uppercase tracking-[0.16em] text-blue-100">Quick actions</p>
+                    <h2 class="mt-3 text-2xl font-black">Sẵn sàng chạy bot?</h2>
+                    <p class="mt-2 text-sm text-blue-100">Tạo trận practice, tải SDK hoặc xem lại lịch sử để debug chiến thuật.</p>
+                    <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                        <a href="/student/match" class="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-blue-700 transition hover:bg-blue-50">Tạo trận với bot</a>
+                        <a href="/student/instructions" class="rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-white ring-1 ring-white/20 transition hover:bg-white/15">Hướng dẫn SDK</a>
+                        <a href="/student/history" class="rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-white ring-1 ring-white/20 transition hover:bg-white/15">Xem lịch sử đấu</a>
+                    </div>
+                </div>
+            </section>
+
+            <section class="rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div class="flex flex-col gap-2 border-b border-slate-100 p-6 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Replay & result</p>
+                        <h2 class="mt-1 text-xl font-black text-slate-950">Trận gần đây</h2>
+                    </div>
+                    <a href="/student/history" class="text-sm font-bold text-blue-600 hover:text-blue-700">Xem tất cả</a>
+                </div>
+
+                <template x-if="matchesData.length === 0">
+                    <div class="p-6">
+                        {{ ui.empty_state('Chưa có trận đấu nào', 'Tạo trận với bot để kiểm tra chiến thuật đầu tiên của đội.', 'Tạo trận với bot', '/student/match') }}
                     </div>
                 </template>
 
-                <template x-if="!teamData">
-                    <p class="text-gray-700">Bạn chưa tham gia nhóm nào.</p>
-                </template>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div class="p-6 border-b border-gray-100">
-                    <h2 class="text-lg font-bold text-gray-900">Lịch sử đấu gần đây</h2>
-                </div>
-                <table class="w-full text-left">
-                    <thead class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold">
-                        <tr>
-                            <th class="px-6 py-4">STT</th>
-                            <th class="px-6 py-4">Đối thủ</th>
-                            <th class="px-6 py-4">Kết quả</th>
-                            <th class="px-6 py-4 text-right">Thời gian</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        <template x-if="matchesData.length === 0">
+                <div x-show="matchesData.length > 0" class="hidden overflow-x-auto md:block">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
                             <tr>
-                                <td class="px-6 py-6 text-sm text-gray-600" colspan="4">
-                                    Chưa có trận đấu nào.
-                                </td>
+                                <th class="px-6 py-4">#</th>
+                                <th class="px-6 py-4">Đối thủ</th>
+                                <th class="px-6 py-4">Kết quả</th>
+                                <th class="px-6 py-4 text-right">Thời gian</th>
                             </tr>
-                        </template>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <template x-for="(match, index) in matchesData" :key="match.id">
+                                <tr class="transition hover:bg-slate-50">
+                                    <td class="px-6 py-4 text-sm font-mono text-slate-500" x-text="index + 1"></td>
+                                    <td class="px-6 py-4 text-sm font-bold text-slate-950" x-text="match.opponent"></td>
+                                    <td class="px-6 py-4"><span class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold" :class="resultBadgeClass(match.result)" x-text="capitalize(match.result)"></span></td>
+                                    <td class="px-6 py-4 text-right text-sm text-slate-500" x-text="formatDate(match.played_at)"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
 
-                        <template x-for="(match, index) in matchesData" :key="match.id">
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-6 py-4 text-sm text-gray-600 font-mono" x-text="index + 1"></td>
-                                <td class="px-6 py-4 text-sm font-semibold text-gray-900" x-text="match.opponent"></td>
-                                <td class="px-6 py-4">
-                                    <span
-                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold"
-                                        :class="match.result === 'thắng' ? 'bg-green-100 text-green-800' : (match.result === 'thua' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800')"
-                                        x-text="capitalize(match.result)"
-                                    ></span>
-                                </td>
-                                <td class="px-6 py-4 text-sm text-gray-500 text-right" x-text="formatDate(match.played_at)"></td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-            </div>
+                <div x-show="matchesData.length > 0" class="space-y-3 p-4 md:hidden">
+                    <template x-for="match in matchesData" :key="match.id">
+                        <div class="rounded-2xl border border-slate-200 p-4">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="text-sm font-bold text-slate-950" x-text="match.opponent"></p>
+                                    <p class="mt-1 text-xs text-slate-500" x-text="formatDate(match.played_at)"></p>
+                                </div>
+                                <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold" :class="resultBadgeClass(match.result)" x-text="capitalize(match.result)"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </section>
         </div>
     </template>
 </div>
@@ -146,12 +158,26 @@
             statsData: { matches: 0, wins: 0, losses: 0 },
             matchesData: [],
 
+            get winRate() {
+                const total = Number(this.statsData.matches) || 0;
+                if (!total) return '0%';
+                return `${Math.round(((Number(this.statsData.wins) || 0) / total) * 100)}%`;
+            },
+
+            get statCards() {
+                return [
+                    { label: 'Tổng trận', value: this.statsData.matches, description: 'Số trận đã hoàn tất', iconClass: 'bg-blue-50 text-blue-600', icon: '<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>' },
+                    { label: 'Thắng', value: this.statsData.wins, description: 'Bot của bạn chiến thắng', iconClass: 'bg-emerald-50 text-emerald-600', icon: '<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' },
+                    { label: 'Thua', value: this.statsData.losses, description: 'Cần debug chiến thuật', iconClass: 'bg-red-50 text-red-600', icon: '<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14L12 5 5 19z"/></svg>' },
+                    { label: 'Tỷ lệ thắng', value: this.winRate, description: 'Tính theo trận đã chơi', iconClass: 'bg-indigo-50 text-indigo-600', icon: '<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>' },
+                ];
+            },
+
             async initPage() {
                 this.loading = true;
                 this.errorMessage = '';
                 try {
                     const result = await window.QXApi.groups.getDashboard();
-
                     const data = result.data || {};
                     this.teamData = data.team || null;
                     this.statsData = data.stats || { matches: 0, wins: 0, losses: 0 };
@@ -165,12 +191,18 @@
 
             toInitials(fullName) {
                 if (!fullName) return '?';
-                return fullName
-                    .split(' ')
-                    .filter(Boolean)
-                    .slice(0, 2)
-                    .map((part) => part[0].toUpperCase())
-                    .join('');
+                return fullName.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join('');
+            },
+
+            resultBadgeClass(result) {
+                if (result === 'thắng') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+                if (result === 'thua') return 'border-red-200 bg-red-50 text-red-700';
+                return 'border-slate-200 bg-slate-50 text-slate-700';
+            },
+
+            copyText(text, message) {
+                if (!text) return;
+                if (window.QXCopy) window.QXCopy(text, message || 'Copied!');
             },
 
             formatDate(value) {

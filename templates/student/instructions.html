@@ -1,114 +1,135 @@
 {% extends "student/base_student.html" %}
+{% import "student/components/ui.html" as ui %}
 
 {% block student_content %}
-<div class="w-full max-w-6xl mx-auto space-y-8">
-    <div>
-        <h1 class="text-2xl font-bold text-gray-900 relative inline-block">
-            Hướng dẫn SDK
-            <span class="absolute -bottom-1 left-0 w-1/3 h-1 bg-[#3547E5] rounded-full"></span>
-        </h1>
-    </div>
+<div class="mx-auto w-full max-w-7xl space-y-8" x-data="sdkInstructions()">
+    {{ ui.page_header('Developer SDK Onboarding', 'Tải SDK, kết nối agent và chạy bot Gomoku đầu tiên của đội bạn trên QuintetX.', 'QuintetX SDK') }}
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-            <h2 class="text-lg font-bold text-gray-900">Tải bộ SDK</h2>
-            <p class="text-sm text-gray-600">Gói zip gồm SDK, runner, GUI, ví dụ bot và mẫu solution để bắt đầu nhanh.</p>
-            <a
-                href="/downloads/sdk/zip"
-                class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[#3547E5] text-white text-sm font-bold hover:bg-blue-700 transition-colors"
-            >
-                Tải quintetx_sdk.zip
-            </a>
-        </section>
+    <section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <a href="/downloads/sdk/zip" class="group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-blue-100">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Download</p>
+                    <h2 class="mt-3 text-2xl font-black text-slate-950">Tải bộ SDK</h2>
+                    <p class="mt-2 text-sm text-slate-500">Gồm client SDK, runner, GUI, bot mẫu và solution tham khảo.</p>
+                </div>
+                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 transition group-hover:bg-blue-600 group-hover:text-white">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5l5 5v11a2 2 0 01-2 2z"/></svg>
+                </div>
+            </div>
+        </a>
 
-        <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-            <h2 class="text-lg font-bold text-gray-900">Tài liệu SDK</h2>
-            <p class="text-sm text-gray-600">Đọc toàn bộ quy trình đăng nhập, chạy bot và chuyển board sang tensor trong SDK_Instruction.md.</p>
-            <a
-                href="/downloads/sdk/instruction"
-                target="_blank"
-                rel="noopener"
-                class="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-[#3547E5] text-[#3547E5] text-sm font-bold hover:bg-blue-50 transition-colors"
-            >
-                Mở SDK_Instruction.md
-            </a>
-        </section>
-    </div>
+        <a href="/downloads/sdk/instruction" target="_blank" rel="noopener" class="group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-blue-100">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">Documentation</p>
+                    <h2 class="mt-3 text-2xl font-black text-slate-950">Mở tài liệu SDK</h2>
+                    <p class="mt-2 text-sm text-slate-500">Đọc đầy đủ API client, heartbeat, strategy loop và tensor helpers.</p>
+                </div>
+                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5s3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18s-3.332.477-4.5 1.253"/></svg>
+                </div>
+            </div>
+        </a>
+    </section>
 
-    <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-5">
-        <h2 class="text-lg font-bold text-gray-900">Luồng kết nối agent</h2>
-
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                <p class="text-[11px] font-bold text-[#3547E5] uppercase">Bước 1</p>
-                <p class="text-sm font-semibold text-gray-900 mt-1">Đăng nhập sinh viên</p>
+    <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Checklist</p>
+                <h2 class="mt-2 text-2xl font-black text-slate-950">Chạy bot đầu tiên</h2>
             </div>
-            <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                <p class="text-[11px] font-bold text-[#3547E5] uppercase">Bước 2</p>
-                <p class="text-sm font-semibold text-gray-900 mt-1">Lấy team_id và api_key tự động</p>
-            </div>
-            <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                <p class="text-[11px] font-bold text-[#3547E5] uppercase">Bước 3</p>
-                <p class="text-sm font-semibold text-gray-900 mt-1">Poll state</p>
-            </div>
-            <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                <p class="text-[11px] font-bold text-[#3547E5] uppercase">Bước 4</p>
-                <p class="text-sm font-semibold text-gray-900 mt-1">Model tính nước đi</p>
-            </div>
-            <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                <p class="text-[11px] font-bold text-[#3547E5] uppercase">Bước 5</p>
-                <p class="text-sm font-semibold text-gray-900 mt-1">Gửi move + heartbeat</p>
-            </div>
+            <span class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">6 bước</span>
         </div>
-
-        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 overflow-x-auto">
-            <svg viewBox="0 0 980 140" class="w-full min-w-[760px] h-24" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Luồng dữ liệu SDK">
-                <defs>
-                    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                        <polygon points="0 0, 10 3.5, 0 7" fill="#3547E5"></polygon>
-                    </marker>
-                </defs>
-                <rect x="10" y="28" width="165" height="84" rx="10" fill="#ffffff" stroke="#dbe1ef"></rect>
-                <rect x="205" y="28" width="165" height="84" rx="10" fill="#ffffff" stroke="#dbe1ef"></rect>
-                <rect x="400" y="28" width="165" height="84" rx="10" fill="#ffffff" stroke="#dbe1ef"></rect>
-                <rect x="595" y="28" width="165" height="84" rx="10" fill="#ffffff" stroke="#dbe1ef"></rect>
-                <rect x="790" y="28" width="180" height="84" rx="10" fill="#ffffff" stroke="#dbe1ef"></rect>
-
-                <text x="92" y="60" text-anchor="middle" font-size="13" font-weight="700" fill="#3547E5">SDK Client</text>
-                <text x="92" y="82" text-anchor="middle" font-size="12" fill="#4b5563">from_student_login()</text>
-
-                <text x="287" y="60" text-anchor="middle" font-size="13" font-weight="700" fill="#3547E5">Server</text>
-                <text x="287" y="82" text-anchor="middle" font-size="12" fill="#4b5563">/init /state /move</text>
-
-                <text x="482" y="60" text-anchor="middle" font-size="13" font-weight="700" fill="#3547E5">Board</text>
-                <text x="482" y="82" text-anchor="middle" font-size="12" fill="#4b5563">list[list[int]]</text>
-
-                <text x="677" y="60" text-anchor="middle" font-size="13" font-weight="700" fill="#3547E5">ML Tensor</text>
-                <text x="677" y="82" text-anchor="middle" font-size="12" fill="#4b5563">NumPy / Torch / TF</text>
-
-                <text x="880" y="60" text-anchor="middle" font-size="13" font-weight="700" fill="#3547E5">Strategy</text>
-                <text x="880" y="82" text-anchor="middle" font-size="12" fill="#4b5563">send_move(x, y)</text>
-
-                <line x1="175" y1="70" x2="200" y2="70" stroke="#3547E5" stroke-width="2.5" marker-end="url(#arrow)"></line>
-                <line x1="370" y1="70" x2="395" y2="70" stroke="#3547E5" stroke-width="2.5" marker-end="url(#arrow)"></line>
-                <line x1="565" y1="70" x2="590" y2="70" stroke="#3547E5" stroke-width="2.5" marker-end="url(#arrow)"></line>
-                <line x1="760" y1="70" x2="785" y2="70" stroke="#3547E5" stroke-width="2.5" marker-end="url(#arrow)"></line>
-            </svg>
+        <div class="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <template x-for="(step, index) in steps" :key="step.title">
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div class="flex items-center gap-3">
+                        <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-sm font-black text-white" x-text="index + 1"></span>
+                        <div>
+                            <p class="text-sm font-bold text-slate-950" x-text="step.title"></p>
+                            <p class="text-xs text-slate-500" x-text="step.text"></p>
+                        </div>
+                    </div>
+                </div>
+            </template>
         </div>
     </section>
 
-    <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-        <h2 class="text-lg font-bold text-gray-900">Bot mẫu tối giản</h2>
-        <pre class="bg-gray-900 text-gray-100 rounded-lg p-4 text-xs overflow-x-auto"><code>from QuintetX_SDK import QuintetXClient
+    <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Agent flow</p>
+        <h2 class="mt-2 text-2xl font-black text-slate-950">Luồng kết nối agent</h2>
+        <div class="mt-6 grid grid-cols-1 gap-3 md:grid-cols-5">
+            <template x-for="node in flow" :key="node.title">
+                <div class="relative rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+                    <p class="text-xs font-bold uppercase tracking-wide text-blue-600" x-text="node.kicker"></p>
+                    <p class="mt-2 text-sm font-black text-slate-950" x-text="node.title"></p>
+                    <p class="mt-1 text-xs text-slate-500" x-text="node.text"></p>
+                </div>
+            </template>
+        </div>
+    </section>
+
+    <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Code templates</p>
+                <h2 class="mt-2 text-2xl font-black text-slate-950">Strategy starter</h2>
+            </div>
+            <div class="flex rounded-2xl bg-slate-100 p-1">
+                <template x-for="tab in codeTabs" :key="tab.id">
+                    <button @click="activeTab = tab.id" class="rounded-xl px-3 py-2 text-xs font-bold transition" :class="activeTab === tab.id ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-900'" x-text="tab.label"></button>
+                </template>
+            </div>
+        </div>
+
+        <template x-for="tab in codeTabs" :key="tab.id">
+            <div x-show="activeTab === tab.id" class="mt-5 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-sm">
+                <div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-wide text-blue-300" x-text="tab.file"></p>
+                        <p class="text-[11px] text-slate-400" x-text="tab.description"></p>
+                    </div>
+                    <button @click="copyCode(tab.code)" class="rounded-xl bg-white/10 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-white/20 focus:outline-none focus:ring-4 focus:ring-blue-500/30">Copy</button>
+                </div>
+                <pre class="overflow-x-auto p-4 text-sm leading-6 text-slate-100"><code x-text="tab.code"></code></pre>
+            </div>
+        </template>
+    </section>
+
+    <section class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Troubleshooting</p>
+            <h2 class="mt-2 text-2xl font-black text-slate-950">Lỗi thường gặp</h2>
+            <div class="mt-5 space-y-3">
+                <template x-for="item in troubleshooting" :key="item.title">
+                    <div class="rounded-2xl border border-slate-200 p-4">
+                        <p class="text-sm font-bold text-slate-950" x-text="item.title"></p>
+                        <p class="mt-1 text-sm text-slate-500" x-text="item.text"></p>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div class="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-600 to-indigo-600 p-6 text-white shadow-sm">
+            <p class="text-xs font-bold uppercase tracking-[0.16em] text-blue-100">Next step</p>
+            <h2 class="mt-2 text-2xl font-black">Sau khi bot chạy</h2>
+            <p class="mt-2 text-sm text-blue-100">Tạo trận với Greedy Bot để kiểm tra strategy, sau đó mở replay để debug từng nước đi.</p>
+            <div class="mt-6 flex flex-col gap-3 sm:flex-row lg:flex-col">
+                <a href="/student/match" class="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-blue-700 transition hover:bg-blue-50">Tạo trận test</a>
+                <a href="/student/history" class="rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-white ring-1 ring-white/20 transition hover:bg-white/15">Xem replay gần đây</a>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+    function sdkInstructions() {
+        const basicCode = `from QuintetX_SDK import QuintetXClient
 
 
-def strategy(state: dict) -&gt; tuple[int, int]:
+def strategy(state: dict) -> tuple[int, int]:
     board = state["board"]
-
-    # Optional: convert board for ML pipelines
-    board_np = QuintetXClient.board_to_numpy(board)
-    _ = board_np  # Replace with your model inference
-
     for x, row in enumerate(board):
         for y, cell in enumerate(row):
             if cell == 0:
@@ -116,16 +137,73 @@ def strategy(state: dict) -&gt; tuple[int, int]:
     return 0, 0
 
 
-client = QuintetXClient.from_student_login(server_url="http://127.0.0.1:8000")
-client.run_with_state(strategy, poll_interval_seconds=0.5, heartbeat_interval_seconds=5.0)</code></pre>
-    </section>
+client = QuintetXClient.from_student_login(server_url="http://127.0.0.1:2111")
+client.run_with_state(strategy, poll_interval_seconds=0.5, heartbeat_interval_seconds=5.0)`;
 
-    <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-        <h2 class="text-lg font-bold text-gray-900">Chuyển board sang tensor</h2>
-        <pre class="bg-gray-900 text-gray-100 rounded-lg p-4 text-xs overflow-x-auto"><code># board is list[list[int]] from state["board"]
-board_np = QuintetXClient.board_to_numpy(board, dtype="float32")
-board_torch = QuintetXClient.board_to_torch(board, dtype="float32", device="cpu")
-board_tf = QuintetXClient.board_to_tensorflow(board, dtype="float32")</code></pre>
-    </section>
-</div>
+        const numpyCode = `from QuintetX_SDK import QuintetXClient
+
+
+def strategy(state: dict) -> tuple[int, int]:
+    board_np = QuintetXClient.board_to_numpy(state["board"], dtype="float32")
+    # TODO: model inference with board_np
+    empty = (board_np == 0).nonzero()
+    return int(empty[0][0]), int(empty[1][0])`;
+
+        const torchCode = `from QuintetX_SDK import QuintetXClient
+
+
+def strategy(state: dict) -> tuple[int, int]:
+    board_tensor = QuintetXClient.board_to_torch(state["board"], dtype="float32", device="cpu")
+    # TODO: torch model inference
+    empty = (board_tensor == 0).nonzero()
+    return int(empty[0][0]), int(empty[0][1])`;
+
+        const tfCode = `from QuintetX_SDK import QuintetXClient
+
+
+def strategy(state: dict) -> tuple[int, int]:
+    board_tensor = QuintetXClient.board_to_tensorflow(state["board"], dtype="float32")
+    # TODO: TensorFlow model inference
+    board_np = board_tensor.numpy()
+    for x in range(board_np.shape[0]):
+        for y in range(board_np.shape[1]):
+            if board_np[x, y] == 0:
+                return x, y
+    return 0, 0`;
+
+        return {
+            activeTab: 'basic',
+            steps: [
+                { title: 'Tải SDK', text: 'Download zip từ QuintetX.' },
+                { title: 'Cài dependencies', text: 'Chuẩn bị Python env và package ML.' },
+                { title: 'Đăng nhập', text: 'SDK lấy team_id/api_key từ tài khoản.' },
+                { title: 'Viết strategy', text: 'Hàm nhận state và trả về (x, y).' },
+                { title: 'Chạy bot', text: 'SDK poll state, heartbeat và gửi move.' },
+                { title: 'Xem replay', text: 'Debug trận đấu trong match viewer.' },
+            ],
+            flow: [
+                { kicker: '01', title: 'SDK Client', text: 'from_student_login()' },
+                { kicker: '02', title: 'Server', text: '/init /state /move' },
+                { kicker: '03', title: 'Board', text: 'list[list[int]]' },
+                { kicker: '04', title: 'ML Tensor', text: 'NumPy / Torch / TF' },
+                { kicker: '05', title: 'Strategy', text: 'send_move(x, y)' },
+            ],
+            codeTabs: [
+                { id: 'basic', label: 'Basic', file: 'bot_basic.py', description: 'Bot tối giản tìm ô trống đầu tiên.', code: basicCode },
+                { id: 'numpy', label: 'NumPy', file: 'bot_numpy.py', description: 'Chuyển board sang ndarray.', code: numpyCode },
+                { id: 'torch', label: 'PyTorch', file: 'bot_torch.py', description: 'Chuyển board sang torch tensor.', code: torchCode },
+                { id: 'tf', label: 'TensorFlow', file: 'bot_tensorflow.py', description: 'Chuyển board sang TensorFlow tensor.', code: tfCode },
+            ],
+            troubleshooting: [
+                { title: 'Không kết nối server', text: 'Kiểm tra server_url, port 2111 và server FastAPI đang chạy.' },
+                { title: 'Sai team_id/api_key', text: 'Đăng nhập đúng tài khoản đội hoặc tạo trận trước khi chạy agent.' },
+                { title: 'Bot không gửi heartbeat', text: 'Dùng run_with_state để SDK tự heartbeat định kỳ.' },
+                { title: 'Move không hợp lệ', text: 'Đảm bảo tọa độ nằm trong board và ô đang trống.' },
+            ],
+            copyCode(code) {
+                if (window.QXCopy) window.QXCopy(code, 'Đã sao chép code');
+            },
+        };
+    }
+</script>
 {% endblock %}
